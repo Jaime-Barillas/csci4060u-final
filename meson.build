@@ -22,7 +22,8 @@ sdl3_opts.add_cmake_defines({
   'CMAKE_POSITION_INDEPENDENT_CODE': true,  # For Linux
 })
 sdl3 = cmake.subproject('sdl', options: sdl3_opts)
-sdl3_dep = sdl3.get_variable(lib_type == 'shared' ? 'SDL3_shared_dep' : 'SDL3_static_dep')
+message('CMake targets:\n - ' + '\n - '.join(sdl3.target_list()))
+sdl3_dep = sdl3.dependency(lib_type == 'shared' ? 'SDL3_shared' : 'SDL3_static')
 
 
 
