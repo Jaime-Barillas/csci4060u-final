@@ -3,19 +3,26 @@ project('final', 'c',
   default_options : [
     'c_std=c11',
     'warning_level=3',
-    'default_library=static'
+    'default_library=shared'
   ]
 )
 
-fs = import('fs')
-
+cmake = import('cmake')
 
 
 # ##############
 # Shared Dependencies
 # ##############
-sdl3 = subproject('sdl')
-sdl3_dep = sdl3.get_variable('SDL3_shared_dep')
+lib_type = get_option('default_library')
+sdl3_opts = cmake.subproject_options()
+sdl3_opts.add_cmake_defines({
+  'SDL_SHARED': lib_type == 'shared',
+  'SDL_STATIC': lib_type == 'static',
+  'SDL_TEST_LIBRARY': false,
+  'CMAKE_POSITION_INDEPENDENT_CODE': true,  # For Linux
+})
+sdl3 = cmake.subproject('sdl', options: sdl3_opts)
+sdl3_dep = sdl3.get_variable(lib_type == 'shared' ? 'SDL3_shared_dep' : 'SDL3_static_dep')
 
 
 
