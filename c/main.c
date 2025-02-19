@@ -8,6 +8,7 @@
 #include <SDL3/SDL_timer.h>
 #include <SDL3/SDL_rect.h>
 #include <SDL3/SDL_blendmode.h>
+#include <SDL3/SDL_stdinc.h>
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -36,6 +37,7 @@ uint64_t old_time;
 double interaction_radius;
 double bin_size;
 bool draw_grid;
+double collision_friction = 1;
 
 void initialize(void) {
     SDL_Log("\x1b[2J"); // Clear screen.
@@ -43,8 +45,8 @@ void initialize(void) {
     for (int i = 0; i < PCOUNT; i++) {
         particles[i].x = SDL_randf() * WINDOW_WIDTH;
         particles[i].y = SDL_randf() * WINDOW_HEIGHT;
-        particles[i].vx = SDL_randf() * 2.0 - 1.0;
-        particles[i].vy = SDL_randf() * 2.0 - 1.0;
+        particles[i].vx = SDL_randf() * 20.0 - 10.0;
+        particles[i].vy = SDL_randf() * 20.0 - 10.0;
     }
 
     old_time = SDL_GetTicksNS();
@@ -135,10 +137,53 @@ void iterate(double dt) {
     for (int i = 0; i < PCOUNT; i++) {
         particles[i].x += particles[i].vx * dt;
         particles[i].y += particles[i].vy * dt;
+
+        // Resolve collisions.
+        {
+            // NOTE: Velocity of bodies will always be 0 since they are fixed
+            // in place.
+            double v_rel_x = particles[i].vx * dt /* - (v_body_x * dt) */;
+            double v_rel_y = particles[i].vy * dt /* - (v_body_y * dt) */;
+
+            // Window bounds (X).
+            if (particles[i].x < 0 || particles[i].x > WINDOW_WIDTH) {
+                // v_normal = dot(v_rel, nor) * nor
+                double v_normal_x = -v_rel_x;
+                double v_normal_y = 0;
+                // v_tangent = v_rel - v_normal
+                double v_tangent_x = 0;
+                double v_tangent_y = v_rel_y;
+
+                particles[i].x += v_normal_x - collision_friction * v_tangent_x;
+                particles[i].y += v_normal_y - collision_friction * v_tangent_y;
+            }
+
+            // Window bounds (Y).
+            if (particles[i].y < 0 || particles[i].y > WINDOW_HEIGHT) {
+                // v_normal = dot(v_rel, nor) * nor
+                double v_normal_x = 0;
+                double v_normal_y = -v_rel_y;
+                // v_tangent = v_rel - v_normal
+                double v_tangent_x = v_rel_x;
+                double v_tangent_y = 0;
+
+                particles[i].x += v_normal_x - collision_friction * v_tangent_x;
+                particles[i].y += v_normal_y - collision_friction * v_tangent_y;
+            }
+
+            // Extract any particles still outside window bounds (e.g. those
+            // near corners.)
+            particles[i].x = SDL_clamp(particles[i].x, 0, WINDOW_WIDTH);
+            particles[i].y = SDL_clamp(particles[i].y, 0, WINDOW_HEIGHT);
+        }
     }
 }
 
 
+
+//***************
+//* SDL Functions
+//***************
 
 SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
 {
