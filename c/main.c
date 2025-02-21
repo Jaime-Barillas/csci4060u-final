@@ -25,6 +25,9 @@
 #define DENSITY_REST 10.0
 #define DENSITY_STRENGTH 0.004
 #define NEAR_DENSITY_STRENGTH 0.01
+#define SPRING_CONSTANT 0.3
+#define SPRING_REST_LENGTH 7.5
+#define COLLISION_FRICTION 0.4
 
 static SDL_Window *window = NULL;
 static SDL_Renderer *renderer = NULL;
@@ -45,7 +48,6 @@ double bin_size;
 int64_t grid_width;
 int64_t grid_height;
 bool draw_grid;
-double collision_friction = 0.4;
 
 void initialize(void) {
     SDL_Log("\x1b[2J"); // Clear screen.
@@ -108,8 +110,8 @@ int64_t bin_index(int64_t x, int64_t y, int64_t width, int64_t height) {
     int64_t b_size = (int64_t)bin_size;
     // Account for particles on the right/bottom edge. These would result in a
     // buffer overflow otherwise.
-    x = SDL_max(x - 1, 0);
-    y = SDL_max(y - 1, 0);
+    x = SDL_clamp(x, 0, WINDOW_WIDTH - 1);
+    y = SDL_clamp(y, 0, WINDOW_HEIGHT - 1);
     return ((width * (y / b_size)) + (x / b_size)); // % (width * height);
 }
 
@@ -216,35 +218,72 @@ void double_density_relaxation(size_t idx, double dt) {
     double d_x = 0;
     double d_y = 0;
     for (int64_t y = bin_y - 1; y <= bin_y + 1; y++) {
-    for (int64_t x = bin_x - 1; x <= bin_x + 1; x++) {
-        int64_t bin_idx = bin_coords_to_index(x, y);
-        // Skip bins beyond left, right, top, and bottom side.
-        if (!valid_bin_index(x, y)) { continue; }
-        if (bin_empty(bin_idx)) { continue; }
+        for (int64_t x = bin_x - 1; x <= bin_x + 1; x++) {
+            int64_t bin_idx = bin_coords_to_index(x, y);
+            // Skip bins beyond left, right, top, and bottom side.
+            if (!valid_bin_index(x, y)) { continue; }
+            if (bin_empty(bin_idx)) { continue; }
 
-        int64_t start_index = count[bin_idx] - 1;
-        int64_t end_index = (bin_idx >= (grid_width * grid_height)) ? PCOUNT : count[bin_idx + 1] - 1;
-        for (int64_t j = start_index; j < end_index; j++) {
-            if (idx == j) continue;  // Skip self.
-            double r_x = particles[j].x - particles[idx].x;
-            double r_y = particles[j].y - particles[idx].y;
-            double r = SDL_sqrt((r_x * r_x) + (r_y * r_y));
-            double d = 1 - (r / interaction_radius);
-            // Consider only particles closer than the interaction radius.
-            if (d > 0) {
-                double D = (dt * dt) * ((pressure * d) + (near_pressure * d * d));
-                double D_x = D * (r_x / r);
-                double D_y = D * (r_y / r);
+            int64_t start_index = count[bin_idx] - 1;
+            int64_t end_index = (bin_idx >= (grid_width * grid_height)) ? PCOUNT : count[bin_idx + 1] - 1;
+            for (int64_t j = start_index; j < end_index; j++) {
+                if (idx == j) continue;  // Skip self.
+                double r_x = particles[j].x - particles[idx].x;
+                double r_y = particles[j].y - particles[idx].y;
+                double r = SDL_sqrt((r_x * r_x) + (r_y * r_y));
+                double d = 1 - (r / interaction_radius);
+                // Consider only particles closer than the interaction radius.
+                if (d > 0) {
+                    double D = (dt * dt) * ((pressure * d) + (near_pressure * d * d));
+                    double D_x = D * (r_x / r);
+                    double D_y = D * (r_y / r);
 
-                particles[j].x += D_x / 2;
-                particles[j].y += D_y / 2;
-                d_x -= D_x / 2;
-                d_y -= D_y / 2;
+                    particles[j].x += D_x / 2;
+                    particles[j].y += D_y / 2;
+                    d_x -= D_x / 2;
+                    d_y -= D_y / 2;
+                }
             }
         }
-    }}
+    }
     particles[idx].x += d_x;
     particles[idx].y += d_y;
+}
+
+void spring_displacements(size_t idx, double dt) {
+    int64_t bin = bin_index(particles[idx].x, particles[idx].y, grid_width, grid_height);
+    int64_t bin_x;
+    int64_t bin_y;
+    bin_index_to_coords(bin, &bin_x, &bin_y);
+    for (int64_t y = bin_y - 1; y <= bin_y + 1; y++) {
+        for (int64_t x = bin_x - 1; x <= bin_x + 1; x++) {
+            int64_t bin_idx = bin_coords_to_index(x, y);
+            // Skip bins beyond left, right, top, and bottom side.
+            if (!valid_bin_index(x, y)) { continue; }
+            if (bin_empty(bin_idx)) { continue; }
+
+            int64_t start_index = count[bin_idx] - 1;
+            int64_t end_index = (bin_idx >= (grid_width * grid_height)) ? PCOUNT : count[bin_idx + 1] - 1;
+            for (int64_t j = start_index; j < end_index; j++) {
+                if (idx == j) continue;  // Skip self.
+                double r_x = particles[j].x - particles[idx].x;
+                double r_y = particles[j].y - particles[idx].y;
+                double r = SDL_sqrt((r_x * r_x) + (r_y * r_y));
+                double d = 1 - (r / interaction_radius);
+                // Consider only particles closer than the interaction radius.
+                if (d > 0) {
+                    double D = (dt * dt) * SPRING_CONSTANT * (1 - SPRING_REST_LENGTH / interaction_radius) * (SPRING_REST_LENGTH - r);
+                    double D_x = D * (r_x / r);
+                    double D_y = D * (r_y / r);
+
+                    particles[idx].x -= D_x / 2;
+                    particles[idx].y -= D_y / 2;
+                    particles[j].x += D_x / 2;
+                    particles[j].y += D_y / 2;
+                }
+            }
+        }
+    }
 }
 
 void iterate(double dt) {
@@ -258,11 +297,11 @@ void iterate(double dt) {
         // 2.5 Cap velocity.
         double sign_vx = (0.0 < particles[i].vx) - (particles[i].vx < 0.0);
         double sign_vy = (0.0 < particles[i].vy) - (particles[i].vy < 0.0);
-        if (SDL_fabs(particles[i].vx) > 2 * GRAVITY) {
-            particles[i].vx =  sign_vx * 2 * GRAVITY;
+        if (SDL_fabs(particles[i].vx) > 3 * GRAVITY) {
+            particles[i].vx = sign_vx * 3 * GRAVITY;
         }
-        if (SDL_fabs(particles[i].vy) > 2 * GRAVITY) {
-            particles[i].vy = sign_vy * 2 * GRAVITY;
+        if (SDL_fabs(particles[i].vy) > 3 * GRAVITY) {
+            particles[i].vy = sign_vy * 3 * GRAVITY;
         }
 
         // 3. Apply viscosity to velocities.
@@ -279,9 +318,12 @@ void iterate(double dt) {
 
         // 5. Adjust springs.
         // ...
+        // Elasticity only => constant rest length => this step is unnecessary
 
         // 6. Apply spring displacements.
-        // ...
+        {
+            spring_displacements(i, dt);
+        }
 
         // 7. Apply double densitiy relaxation displacements.
         {
@@ -304,8 +346,8 @@ void iterate(double dt) {
                 double v_tangent_x = 0;
                 double v_tangent_y = v_rel_y;
 
-                particles[i].x += v_normal_x - collision_friction * v_tangent_x;
-                particles[i].y += v_normal_y - collision_friction * v_tangent_y;
+                particles[i].x += v_normal_x - COLLISION_FRICTION * v_tangent_x;
+                particles[i].y += v_normal_y - COLLISION_FRICTION * v_tangent_y;
             }
 
             // Window bounds (Y).
@@ -317,8 +359,8 @@ void iterate(double dt) {
                 double v_tangent_x = v_rel_x;
                 double v_tangent_y = 0;
 
-                particles[i].x += v_normal_x - collision_friction * v_tangent_x;
-                particles[i].y += v_normal_y - collision_friction * v_tangent_y;
+                particles[i].x += v_normal_x - COLLISION_FRICTION * v_tangent_x;
+                particles[i].y += v_normal_y - COLLISION_FRICTION * v_tangent_y;
             }
 
             // Extract any particles still outside window bounds (e.g. those
