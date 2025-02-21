@@ -13,6 +13,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h> // memset().
+#include <stdlib.h> // malloc()
 
 #define WINDOW_WIDTH 640
 #define WINDOW_HEIGHT 480
@@ -20,6 +21,10 @@
 #define MILLI_PER_FRAME ( 1000.0 / TARGET_FPS )
 
 #define PCOUNT 1000
+#define GRAVITY 0.0981
+#define DENSITY_REST 10.0
+#define DENSITY_STRENGTH 0.004
+#define NEAR_DENSITY_STRENGTH 0.01
 
 static SDL_Window *window = NULL;
 static SDL_Renderer *renderer = NULL;
@@ -32,55 +37,64 @@ typedef struct Particle_T {
 } Particle;
 
 Particle particles[PCOUNT];
-uint64_t old_time;
+int64_t *count; // Count array.
+int64_t old_time;
 
 double interaction_radius;
 double bin_size;
+int64_t grid_width;
+int64_t grid_height;
 bool draw_grid;
-double collision_friction = 1;
+double collision_friction = 0.4;
 
 void initialize(void) {
     SDL_Log("\x1b[2J"); // Clear screen.
 
-    for (int i = 0; i < PCOUNT; i++) {
+    for (size_t i = 0; i < PCOUNT; i++) {
         particles[i].x = SDL_randf() * WINDOW_WIDTH;
-        particles[i].y = SDL_randf() * WINDOW_HEIGHT;
-        particles[i].vx = SDL_randf() * 20.0 - 10.0;
-        particles[i].vy = SDL_randf() * 20.0 - 10.0;
+        particles[i].y = SDL_randf() * (WINDOW_HEIGHT - (WINDOW_HEIGHT * 3.0) / 4.0);
+        particles[i].vx = 0.0;//(SDL_randf() * 15.0 + 5.0) * ((SDL_randf() < 0.5) ? 1 : -1);
+        particles[i].vy = 0.0;
     }
 
     old_time = SDL_GetTicksNS();
-    interaction_radius = 20.0;
+    interaction_radius = 10.0;
     bin_size = (interaction_radius * 2.0);
+    grid_width = (int64_t)SDL_ceil(WINDOW_WIDTH / bin_size);
+    grid_height = (int64_t)SDL_ceil(WINDOW_HEIGHT / bin_size);
+    count = (int64_t*)malloc((grid_width * grid_height) * sizeof(int64_t));
     draw_grid = true;
 }
 
 void draw(void) {
-    // Render the particles
     SDL_SetRenderDrawColor(renderer, 96, 61, 31, 255);
     SDL_RenderClear(renderer);
     SDL_FRect rect;
 
-    SDL_SetRenderDrawColor(renderer, 255, 255, 255, 16);
-    rect.y = 0;
-    rect.w = 2;
-    rect.h = WINDOW_HEIGHT;
-    for (int x = 0; x < WINDOW_WIDTH; x += bin_size) {
-        rect.x = x;
-        SDL_RenderFillRect(renderer, &rect);
-    }
-    rect.x = 0;
-    rect.w = WINDOW_WIDTH;
-    rect.h = 2;
-    for (int y = 0; y < WINDOW_HEIGHT; y += bin_size) {
-        rect.y = y;
-        SDL_RenderFillRect(renderer, &rect);
+    // Render grid.
+    if (draw_grid) {
+        SDL_SetRenderDrawColor(renderer, 255, 255, 255, 16);
+        rect.y = 0;
+        rect.w = 2;
+        rect.h = WINDOW_HEIGHT;
+        for (size_t x = 0; x < WINDOW_WIDTH; x += bin_size) {
+            rect.x = x;
+            SDL_RenderFillRect(renderer, &rect);
+        }
+        rect.x = 0;
+        rect.w = WINDOW_WIDTH;
+        rect.h = 2;
+        for (size_t y = 0; y < WINDOW_HEIGHT; y += bin_size) {
+            rect.y = y;
+            SDL_RenderFillRect(renderer, &rect);
+        }
     }
 
+    // Render the particles
     SDL_SetRenderDrawColor(renderer, 55, 75, 178, 255);
     rect.w = 5;
     rect.h = 5;
-    for (int i = 0; i < PCOUNT; i++) {
+    for (size_t i = 0; i < PCOUNT; i++) {
         rect.x = particles[i].x - (rect.w / 2.0);
         rect.y = particles[i].y - (rect.h / 2.0);
         SDL_RenderFillRect(renderer, &rect);
@@ -89,30 +103,38 @@ void draw(void) {
     SDL_RenderPresent(renderer);
 }
 
-size_t bin_index(int32_t x, int32_t y, int32_t width, int32_t height) {
+int64_t bin_index(int64_t x, int64_t y, int64_t width, int64_t height) {
     // FIXME: Handle negative x & y values, wrap around max index: (width * height).
-    int32_t b_size = (int32_t)bin_size;
+    int64_t b_size = (int64_t)bin_size;
+    // Account for particles on the right/bottom edge. These would result in a
+    // buffer overflow otherwise.
+    x = SDL_max(x - 1, 0);
+    y = SDL_max(y - 1, 0);
     return ((width * (y / b_size)) + (x / b_size)); // % (width * height);
 }
 
 void sort_into_bins(Particle ps[PCOUNT]) {
     // Counting + Cycle sort. Sorts particles based on the grid cell (bin) they
     // belong to using its index as their key.
-    int32_t grid_width = (int32_t)SDL_ceil(WINDOW_WIDTH / bin_size);
-    int32_t grid_height = (int32_t)SDL_ceil(WINDOW_HEIGHT / bin_size);
     size_t num_cells = (grid_width * grid_height);
-    size_t count[num_cells];
-    memset(count, 0, num_cells * sizeof(size_t));
+    memset(count, 0, num_cells * sizeof(int64_t));
 
     for (size_t i = 0; i < PCOUNT; i++) {
-        int32_t x = (int32_t)ps[i].x;
-        int32_t y = (int32_t)ps[i].y;
-        size_t key = bin_index(x, y, grid_width, grid_height);
+        int64_t x = (int64_t)ps[i].x;
+        int64_t y = (int64_t)ps[i].y;
+        int64_t key = bin_index(x, y, grid_width, grid_height);
         count[key] += 1;
     }
 
+    // Keep 0's in empty bins even when calculating the prefix sum.
+    // These 0's will be later used to detect empty bins during the simulation
+    // steps.
+    size_t last_non_zero = 0;
     for (size_t i = 1; i < num_cells; i++) {
-        count[i] += count[i - 1];
+        if (count[i] != 0) {
+            count[i] += count[last_non_zero];
+            last_non_zero = i;
+        }
     }
 
     // In-place cycle sort.
@@ -120,9 +142,9 @@ void sort_into_bins(Particle ps[PCOUNT]) {
     // See: https://stackoverflow.com/a/62598539
     Particle temp;
     for (size_t i = 0; i < PCOUNT; i++) {
-        int32_t x = (int32_t)ps[i].x;
-        int32_t y = (int32_t)ps[i].y;
-        size_t key = bin_index(x, y, grid_width, grid_height);
+        int64_t x = (int64_t)ps[i].x;
+        int64_t y = (int64_t)ps[i].y;
+        int64_t key = bin_index(x, y, grid_width, grid_height);
         while (i < count[key] - 1) {
             temp = ps[count[key] - 1];
             ps[count[key] - 1] = ps[i];
@@ -132,21 +154,149 @@ void sort_into_bins(Particle ps[PCOUNT]) {
     }
 }
 
-void iterate(double dt) {
-    sort_into_bins(particles);
-    for (int i = 0; i < PCOUNT; i++) {
-        particles[i].x += particles[i].vx * dt;
-        particles[i].y += particles[i].vy * dt;
+void bin_index_to_coords(int64_t bin_index, int64_t *bin_x, int64_t *bin_y) {
+    *bin_x = bin_index % grid_width;
+    *bin_y = bin_index / grid_width;
+}
 
-        // Resolve collisions.
+int64_t bin_coords_to_index(int64_t bin_x, int64_t bin_y) {
+    return (bin_y * grid_width) + bin_x;
+}
+
+bool valid_bin_index(int64_t bin_x, int64_t bin_y) {
+    return (bin_x >= 0) && (bin_x < grid_width) &&
+           (bin_y >= 0) && (bin_y < grid_height);
+}
+
+bool bin_empty(int64_t bin_index) {
+    return count[bin_index] == 0;
+}
+
+void double_density_relaxation(size_t idx, double dt) {
+    double density = 0;
+    double near_density = 0;
+    double pressure = 0;
+    double near_pressure = 0;
+    int64_t bin = bin_index(particles[idx].x, particles[idx].y, grid_width, grid_height);
+    int64_t bin_x;
+    int64_t bin_y;
+    bin_index_to_coords(bin, &bin_x, &bin_y);
+
+    // Check 3x3 bins centered on the particle.
+    for (int64_t y = bin_y - 1; y <= bin_y + 1; y++) {
+        for (int64_t x = bin_x - 1; x <= bin_x + 1; x++) {
+            int64_t bin_idx = bin_coords_to_index(x, y);
+            // Skip bins beyond left, right, top, and bottom side.
+            // NOTE: After sorting, *count contains 1-indexed position of first
+            // particle in bin slot i. *count will contain 0 if there are no
+            // particles in the bin.
+            if (!valid_bin_index(x, y)) { continue; }
+            if (bin_empty(bin_idx)){ continue; }
+
+            int64_t start_index = count[bin_idx] - 1;
+            int64_t end_index = (bin_idx >= (grid_width * grid_height)) ? PCOUNT : count[bin_idx + 1] - 1;
+            for (int64_t j = start_index; j < end_index; j++) {
+                if (idx == j) continue;  // Skip self.
+                double r_x = particles[j].x - particles[idx].x;
+                double r_y = particles[j].y - particles[idx].y;
+                double r = SDL_sqrt((r_x * r_x) + (r_y * r_y));
+                double d = 1 - (r / interaction_radius);
+                // Consider only particles closer than the interaction radius.
+                if (d > 0) {
+                    density += d * d;
+                    near_density += d * d * d;
+                }
+            }
+        }
+    }
+
+    pressure = DENSITY_STRENGTH * (density - DENSITY_REST);
+    near_pressure = NEAR_DENSITY_STRENGTH * near_density;
+
+    double d_x = 0;
+    double d_y = 0;
+    for (int64_t y = bin_y - 1; y <= bin_y + 1; y++) {
+    for (int64_t x = bin_x - 1; x <= bin_x + 1; x++) {
+        int64_t bin_idx = bin_coords_to_index(x, y);
+        // Skip bins beyond left, right, top, and bottom side.
+        if (!valid_bin_index(x, y)) { continue; }
+        if (bin_empty(bin_idx)) { continue; }
+
+        int64_t start_index = count[bin_idx] - 1;
+        int64_t end_index = (bin_idx >= (grid_width * grid_height)) ? PCOUNT : count[bin_idx + 1] - 1;
+        for (int64_t j = start_index; j < end_index; j++) {
+            if (idx == j) continue;  // Skip self.
+            double r_x = particles[j].x - particles[idx].x;
+            double r_y = particles[j].y - particles[idx].y;
+            double r = SDL_sqrt((r_x * r_x) + (r_y * r_y));
+            double d = 1 - (r / interaction_radius);
+            // Consider only particles closer than the interaction radius.
+            if (d > 0) {
+                double D = (dt * dt) * ((pressure * d) + (near_pressure * d * d));
+                double D_x = D * (r_x / r);
+                double D_y = D * (r_y / r);
+
+                particles[j].x += D_x / 2;
+                particles[j].y += D_y / 2;
+                d_x -= D_x / 2;
+                d_y -= D_y / 2;
+            }
+        }
+    }}
+    particles[idx].x += d_x;
+    particles[idx].y += d_y;
+}
+
+void iterate(double dt) {
+    // 1. Sort particles for faster neighbour queries.
+    sort_into_bins(particles);
+
+    for (size_t i = 0; i < PCOUNT; i++) {
+        // 2. Apply gravity to velocities.
+        particles[i].vy += GRAVITY * dt;
+
+        // 2.5 Cap velocity.
+        double sign_vx = (0.0 < particles[i].vx) - (particles[i].vx < 0.0);
+        double sign_vy = (0.0 < particles[i].vy) - (particles[i].vy < 0.0);
+        if (SDL_fabs(particles[i].vx) > 2 * GRAVITY) {
+            particles[i].vx =  sign_vx * 2 * GRAVITY;
+        }
+        if (SDL_fabs(particles[i].vy) > 2 * GRAVITY) {
+            particles[i].vy = sign_vy * 2 * GRAVITY;
+        }
+
+        // 3. Apply viscosity to velocities.
+        // ...
+
+        // 4. Advance to predicted position.
+        // Saving old position for next velocity computation.
+        double old_x = particles[i].x;
+        double old_y = particles[i].y;
         {
-            // NOTE: Velocity of bodies will always be 0 since they are fixed
-            // in place.
+            particles[i].x += particles[i].vx * dt;
+            particles[i].y += particles[i].vy * dt;
+        }
+
+        // 5. Adjust springs.
+        // ...
+
+        // 6. Apply spring displacements.
+        // ...
+
+        // 7. Apply double densitiy relaxation displacements.
+        {
+            double_density_relaxation(i, dt);
+        }
+
+        // 8. Resolve collisions.
+        {
+            // NOTE: Velocity of non-particle bodies will always be 0 since
+            // they are fixed in place.
             double v_rel_x = particles[i].vx * dt /* - (v_body_x * dt) */;
             double v_rel_y = particles[i].vy * dt /* - (v_body_y * dt) */;
 
             // Window bounds (X).
-            if (particles[i].x < 0 || particles[i].x > WINDOW_WIDTH) {
+            if (particles[i].x < 0 || particles[i].x >= WINDOW_WIDTH) {
                 // v_normal = dot(v_rel, nor) * nor
                 double v_normal_x = -v_rel_x;
                 double v_normal_y = 0;
@@ -159,7 +309,7 @@ void iterate(double dt) {
             }
 
             // Window bounds (Y).
-            if (particles[i].y < 0 || particles[i].y > WINDOW_HEIGHT) {
+            if (particles[i].y < 0 || particles[i].y >= WINDOW_HEIGHT) {
                 // v_normal = dot(v_rel, nor) * nor
                 double v_normal_x = 0;
                 double v_normal_y = -v_rel_y;
@@ -176,6 +326,10 @@ void iterate(double dt) {
             particles[i].x = SDL_clamp(particles[i].x, 0, WINDOW_WIDTH);
             particles[i].y = SDL_clamp(particles[i].y, 0, WINDOW_HEIGHT);
         }
+
+        // 9. Compute next velocity.
+        particles[i].vx = (particles[i].x - old_x) / dt;
+        particles[i].vy = (particles[i].y - old_y) / dt;
     }
 }
 
@@ -223,7 +377,7 @@ SDL_AppResult SDL_AppIterate(void *appstate)
     SDL_Log("\x1b[H\x1b[0KFPS: %.2f", 1.0e9 / dt);
     SDL_Log("\x1b[0KLast Frame Time: %.2fms", dt / 1.0e6);
 
-    iterate(dt / 1.0e9);
+    iterate(1.0/*dt / 1.0e9*/);
     draw();
 
     // if ((dt / 1.0e6) < MILLI_PER_FRAME)
