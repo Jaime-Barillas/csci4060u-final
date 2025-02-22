@@ -25,11 +25,14 @@ sdl3 = cmake.subproject('sdl', options: sdl3_opts)
 message('CMake targets:\n - ' + '\n - '.join(sdl3.target_list()))
 sdl3_dep = sdl3.dependency(lib_type == 'shared' ? 'SDL3_shared' : 'SDL3_static')
 
+microui = dependency('microui')
+
 
 
 # ##############
 # C Program
 # ##############
+cglm_dep = dependency('cglm', fallback : ['cglm', 'cglm_dep'])
 c_exe = 'final-c'
 c_sources = files(
   'c/main.c'
@@ -38,7 +41,7 @@ executable(c_exe,
   c_sources,
   c_args: ['-fopenmp'],
   link_args: ['-fopenmp'],
-  dependencies: sdl3_dep,
+  dependencies: [sdl3_dep, cglm_dep, microui],
 )
 
 

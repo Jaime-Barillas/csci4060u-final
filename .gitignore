@@ -1,3 +1,6 @@
 .clangd
 
+subprojects/packagecache/
 subprojects/sdl/
+subprojects/cglm-0.9.6/
+subprojects/microui/
