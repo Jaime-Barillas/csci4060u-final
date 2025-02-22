@@ -40,8 +40,8 @@ void sim_step(SimCtx *ctx, float dt) {
     {
       // FIXME: Add linear repulsive force.
       // Clamp to window bounds.
-      ctx->ps[i].pos.x = SDL_clamp(ctx->ps[i].pos.x, 0, ctx->window_width);
-      ctx->ps[i].pos.y = SDL_clamp(ctx->ps[i].pos.y, 0, ctx->window_height);
+      ctx->ps[i].pos.x = SDL_clamp(ctx->ps[i].pos.x, 0, ctx->window_width - 1);
+      ctx->ps[i].pos.y = SDL_clamp(ctx->ps[i].pos.y, 0, ctx->window_height - 1);
     }
 
     // 9. Compute next velocity.
