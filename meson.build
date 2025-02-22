@@ -35,7 +35,9 @@ microui = dependency('microui')
 cglm_dep = dependency('cglm', fallback : ['cglm', 'cglm_dep'])
 c_exe = 'final-c'
 c_sources = files(
-  'c/main.c'
+  'c/main.c',
+  'c/util.c',
+  'c/sim.c',
 )
 executable(c_exe,
   c_sources,

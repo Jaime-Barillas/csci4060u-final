@@ -1,3 +1,8 @@
+#include <stdbool.h>
+#include <stdint.h>
+#include <string.h> // memset().
+#include <stdlib.h> // malloc()
+
 #define SDL_MAIN_USE_CALLBACKS 1  /* use the callbacks instead of main() */
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
@@ -9,84 +14,94 @@
 #include <SDL3/SDL_rect.h>
 #include <SDL3/SDL_blendmode.h>
 #include <SDL3/SDL_stdinc.h>
-
-#include <stdbool.h>
-#include <stdint.h>
-#include <string.h> // memset().
-#include <stdlib.h> // malloc()
+#include <SDL3/SDL_events.h>
+#include <cglm/struct.h>
+#include <microui.h>
+#include "sim.h"
 
 #define WINDOW_WIDTH 640
 #define WINDOW_HEIGHT 480
-#define TARGET_FPS 60
-#define MILLI_PER_FRAME ( 1000.0 / TARGET_FPS )
-
-#define PCOUNT 1000
-#define GRAVITY 0.0981
-#define DENSITY_REST 10.0
-#define DENSITY_STRENGTH 0.004
-#define NEAR_DENSITY_STRENGTH 0.01
-#define SPRING_CONSTANT 0.3
-#define SPRING_REST_LENGTH 7.5
-#define COLLISION_FRICTION 0.4
 
 static SDL_Window *window = NULL;
 static SDL_Renderer *renderer = NULL;
 
-typedef struct Particle_T {
-    double vx;
-    double vy;
-    double x;
-    double y;
-} Particle;
+static bool draw_ui;
+static mu_Context *ui;
+static mu_Real ui_pcount;
+static mu_Real ui_sim_steps;
+static mu_Real ui_interaction_radius;
+static mu_Real ui_gravity_x;
+static mu_Real ui_gravity_y;
+static int ui_draw_grid;
 
-Particle particles[PCOUNT];
-int64_t *count; // Count array.
-int64_t old_time;
+static SimCtx ctx;
+static uint64_t old_time;
 
-double interaction_radius;
-double bin_size;
-int64_t grid_width;
-int64_t grid_height;
-bool draw_grid;
-
-void initialize(void) {
-    SDL_Log("\x1b[2J"); // Clear screen.
-
-    for (size_t i = 0; i < PCOUNT; i++) {
-        particles[i].x = SDL_randf() * WINDOW_WIDTH;
-        particles[i].y = SDL_randf() * (WINDOW_HEIGHT - (WINDOW_HEIGHT * 3.0) / 4.0);
-        particles[i].vx = 0.0;//(SDL_randf() * 15.0 + 5.0) * ((SDL_randf() < 0.5) ? 1 : -1);
-        particles[i].vy = 0.0;
-    }
-
-    old_time = SDL_GetTicksNS();
-    interaction_radius = 10.0;
-    bin_size = (interaction_radius * 2.0);
-    grid_width = (int64_t)SDL_ceil(WINDOW_WIDTH / bin_size);
-    grid_height = (int64_t)SDL_ceil(WINDOW_HEIGHT / bin_size);
-    count = (int64_t*)malloc((grid_width * grid_height) * sizeof(int64_t));
-    draw_grid = true;
+static int text_width(mu_Font _, const char *text, int len) {
+    if (len == -1) { len = strlen(text); }
+    return SDL_DEBUG_TEXT_FONT_CHARACTER_SIZE * len;
 }
 
-void draw(void) {
+static int text_height(mu_Font _) {
+    return SDL_DEBUG_TEXT_FONT_CHARACTER_SIZE;
+}
+
+void update_sim_settings(SimCtx *ctx) {
+    ctx->sim_steps = (int64_t)ui_sim_steps;
+    ctx->gravity.x = ui_gravity_x;
+    ctx->gravity.y = ui_gravity_y;
+    ctx->interaction_radius = (int64_t)ui_interaction_radius;
+    ctx->cell_size = ctx->interaction_radius * 2;
+    ctx->grid_width = (int64_t)SDL_ceil((float)ctx->window_width / ctx->cell_size);
+    ctx->grid_height = (int64_t)SDL_ceil((float)ctx->window_height / ctx->cell_size);
+
+    if (ctx->ps) { free(ctx->ps); }
+    if (ctx->cell_pcount) { free(ctx->cell_pcount); }
+    ctx->pcount = (int64_t)ui_pcount;
+    ctx->ps = malloc(ctx->pcount * sizeof(Particle));
+    ctx->cell_count = ctx->grid_width * ctx->grid_height;
+    ctx->cell_pcount = malloc(ctx->cell_count * sizeof(int64_t));
+}
+
+void initialize(void) {
+    ui = malloc(sizeof(mu_Context));
+    mu_init(ui);
+    draw_ui = true;
+    ui->text_width = text_width;
+    ui->text_height = text_height;
+    ui_sim_steps = 1.0;
+    ui_interaction_radius = 30;
+    ui_gravity_x = 0.0;
+    ui_gravity_y = 0.0;
+    ui_pcount = 1000;
+    ui_draw_grid = 1;
+
+    ctx.window_width = WINDOW_WIDTH;
+    ctx.window_height = WINDOW_HEIGHT;
+    update_sim_settings(&ctx);
+
+    old_time = SDL_GetTicksNS();
+}
+
+void draw(SimCtx *ctx) {
     SDL_SetRenderDrawColor(renderer, 96, 61, 31, 255);
     SDL_RenderClear(renderer);
     SDL_FRect rect;
 
     // Render grid.
-    if (draw_grid) {
+    if (ui_draw_grid != 0) {
         SDL_SetRenderDrawColor(renderer, 255, 255, 255, 16);
         rect.y = 0;
         rect.w = 2;
         rect.h = WINDOW_HEIGHT;
-        for (size_t x = 0; x < WINDOW_WIDTH; x += bin_size) {
+        for (size_t x = 0; x < WINDOW_WIDTH; x += ctx->cell_size) {
             rect.x = x;
             SDL_RenderFillRect(renderer, &rect);
         }
         rect.x = 0;
         rect.w = WINDOW_WIDTH;
         rect.h = 2;
-        for (size_t y = 0; y < WINDOW_HEIGHT; y += bin_size) {
+        for (size_t y = 0; y < WINDOW_HEIGHT; y += ctx->cell_size) {
             rect.y = y;
             SDL_RenderFillRect(renderer, &rect);
         }
@@ -94,285 +109,87 @@ void draw(void) {
 
     // Render the particles
     SDL_SetRenderDrawColor(renderer, 55, 75, 178, 255);
-    rect.w = 5;
-    rect.h = 5;
-    for (size_t i = 0; i < PCOUNT; i++) {
-        rect.x = particles[i].x - (rect.w / 2.0);
-        rect.y = particles[i].y - (rect.h / 2.0);
+    rect.w = 10;
+    rect.h = 10;
+    for (int i = 0; i < ctx->pcount; i++) {
+        rect.x = ctx->ps[i].pos.x - (rect.w / 2.0);
+        rect.y = ctx->ps[i].pos.y - (rect.h / 2.0);
         SDL_RenderFillRect(renderer, &rect);
     }
 
+    // Render UI
+    if (draw_ui) {
+        mu_begin(ui);
+        if (mu_begin_window_ex(ui, "Settings", mu_rect(10, 10, 0, 0), MU_OPT_AUTOSIZE | MU_OPT_NOCLOSE | MU_OPT_NORESIZE)) {
+            mu_layout_row(ui, 1, (int[]){365}, 0);
+            mu_label(ui, "Press 'Space Bar' to show/hide window");
+
+            mu_layout_row(ui, 4, (int[]){155, 50, 102, 50}, 0);
+            mu_label(ui, "Particle Count:");
+            if (mu_button(ui, "-100")) {
+                ui_pcount = SDL_max(ui_pcount - 100, 1);
+            }
+            if (mu_number_ex(ui, &ui_pcount, 0.2, "%.0f", MU_OPT_ALIGNCENTER)) {
+                ui_pcount = SDL_clamp(ui_pcount, 1, 3000);
+            }
+            if (mu_button(ui, "+100")) {
+                ui_pcount = SDL_min(ui_pcount + 100, 3000);
+            }
+
+            mu_layout_row(ui, 2, (int[]){155, 210}, 0);
+            mu_label(ui, "Simulation Steps:");
+            mu_slider_ex(ui, &ui_sim_steps, 1.0, 5.0, 1.0, "%.0f", MU_OPT_ALIGNCENTER);
+            mu_label(ui, "Interaction Radius:");
+            mu_slider_ex(ui, &ui_interaction_radius, 1.0, ctx->window_width * 0.25, 1.0, "%.0f", MU_OPT_ALIGNCENTER);
+            mu_label(ui, "Gravity X:");
+            mu_slider_ex(ui, &ui_gravity_x, 0.0, 10, 0.1, "%.1f", MU_OPT_ALIGNCENTER);
+            mu_label(ui, "Gravity Y:");
+            mu_slider_ex(ui, &ui_gravity_y, 0.0, 10, 0.1, "%.1f", MU_OPT_ALIGNCENTER);
+            mu_label(ui, ""); mu_label(ui, "");
+            mu_layout_row(ui, 1, (int[]){365}, 0);
+            mu_checkbox(ui, "Show Grid", &ui_draw_grid);
+            mu_end_window(ui);
+        }
+        mu_end(ui);
+
+        mu_Command *cmd = NULL;
+        mu_Color color;
+        while (mu_next_command(ui, &cmd)) {
+            switch (cmd->type) {
+                case MU_COMMAND_TEXT:
+                    color = cmd->text.color;
+                    SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, color.a);
+                    SDL_RenderDebugText(renderer, cmd->text.pos.x, cmd->text.pos.y, cmd->text.str);
+                    break;
+                case MU_COMMAND_RECT:
+                    color = cmd->rect.color;
+                    rect.x = cmd->rect.rect.x;
+                    rect.y = cmd->rect.rect.y;
+                    rect.w = cmd->rect.rect.w;
+                    rect.h = cmd->rect.rect.h;
+                    SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, color.a);
+                    SDL_RenderFillRect(renderer, &rect);
+                    break;
+                case MU_COMMAND_ICON:
+                    color = cmd->icon.color;
+                    int x = cmd->icon.rect.x + (cmd->icon.rect.w - SDL_DEBUG_TEXT_FONT_CHARACTER_SIZE) / 2;
+                    int y = cmd->icon.rect.y + (cmd->icon.rect.h - SDL_DEBUG_TEXT_FONT_CHARACTER_SIZE) / 2;
+                    if (cmd->icon.id == MU_ICON_CHECK) {
+                        SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, color.a);
+                        SDL_RenderDebugText(renderer, x, y, "x");
+                    }
+                    break;
+                case MU_COMMAND_CLIP:
+                    break;
+                default:
+                    break;
+            }
+        }
+    }
+
+    // TODO: Move to iterate function?
+    update_sim_settings(ctx);
     SDL_RenderPresent(renderer);
-}
-
-int64_t bin_index(int64_t x, int64_t y, int64_t width, int64_t height) {
-    // FIXME: Handle negative x & y values, wrap around max index: (width * height).
-    int64_t b_size = (int64_t)bin_size;
-    // Account for particles on the right/bottom edge. These would result in a
-    // buffer overflow otherwise.
-    x = SDL_clamp(x, 0, WINDOW_WIDTH - 1);
-    y = SDL_clamp(y, 0, WINDOW_HEIGHT - 1);
-    return ((width * (y / b_size)) + (x / b_size)); // % (width * height);
-}
-
-void sort_into_bins(Particle ps[PCOUNT]) {
-    // Counting + Cycle sort. Sorts particles based on the grid cell (bin) they
-    // belong to using its index as their key.
-    size_t num_cells = (grid_width * grid_height);
-    memset(count, 0, num_cells * sizeof(int64_t));
-
-    for (size_t i = 0; i < PCOUNT; i++) {
-        int64_t x = (int64_t)ps[i].x;
-        int64_t y = (int64_t)ps[i].y;
-        int64_t key = bin_index(x, y, grid_width, grid_height);
-        count[key] += 1;
-    }
-
-    // Keep 0's in empty bins even when calculating the prefix sum.
-    // These 0's will be later used to detect empty bins during the simulation
-    // steps.
-    size_t last_non_zero = 0;
-    for (size_t i = 1; i < num_cells; i++) {
-        if (count[i] != 0) {
-            count[i] += count[last_non_zero];
-            last_non_zero = i;
-        }
-    }
-
-    // In-place cycle sort.
-    // See: https://stackoverflow.com/a/15719967
-    // See: https://stackoverflow.com/a/62598539
-    Particle temp;
-    for (size_t i = 0; i < PCOUNT; i++) {
-        int64_t x = (int64_t)ps[i].x;
-        int64_t y = (int64_t)ps[i].y;
-        int64_t key = bin_index(x, y, grid_width, grid_height);
-        while (i < count[key] - 1) {
-            temp = ps[count[key] - 1];
-            ps[count[key] - 1] = ps[i];
-            ps[i] = temp;
-            count[key] -= 1;
-        }
-    }
-}
-
-void bin_index_to_coords(int64_t bin_index, int64_t *bin_x, int64_t *bin_y) {
-    *bin_x = bin_index % grid_width;
-    *bin_y = bin_index / grid_width;
-}
-
-int64_t bin_coords_to_index(int64_t bin_x, int64_t bin_y) {
-    return (bin_y * grid_width) + bin_x;
-}
-
-bool valid_bin_index(int64_t bin_x, int64_t bin_y) {
-    return (bin_x >= 0) && (bin_x < grid_width) &&
-           (bin_y >= 0) && (bin_y < grid_height);
-}
-
-bool bin_empty(int64_t bin_index) {
-    return count[bin_index] == 0;
-}
-
-void double_density_relaxation(size_t idx, double dt) {
-    double density = 0;
-    double near_density = 0;
-    double pressure = 0;
-    double near_pressure = 0;
-    int64_t bin = bin_index(particles[idx].x, particles[idx].y, grid_width, grid_height);
-    int64_t bin_x;
-    int64_t bin_y;
-    bin_index_to_coords(bin, &bin_x, &bin_y);
-
-    // Check 3x3 bins centered on the particle.
-    for (int64_t y = bin_y - 1; y <= bin_y + 1; y++) {
-        for (int64_t x = bin_x - 1; x <= bin_x + 1; x++) {
-            int64_t bin_idx = bin_coords_to_index(x, y);
-            // Skip bins beyond left, right, top, and bottom side.
-            // NOTE: After sorting, *count contains 1-indexed position of first
-            // particle in bin slot i. *count will contain 0 if there are no
-            // particles in the bin.
-            if (!valid_bin_index(x, y)) { continue; }
-            if (bin_empty(bin_idx)){ continue; }
-
-            int64_t start_index = count[bin_idx] - 1;
-            int64_t end_index = (bin_idx >= (grid_width * grid_height)) ? PCOUNT : count[bin_idx + 1] - 1;
-            for (int64_t j = start_index; j < end_index; j++) {
-                if (idx == j) continue;  // Skip self.
-                double r_x = particles[j].x - particles[idx].x;
-                double r_y = particles[j].y - particles[idx].y;
-                double r = SDL_sqrt((r_x * r_x) + (r_y * r_y));
-                double d = 1 - (r / interaction_radius);
-                // Consider only particles closer than the interaction radius.
-                if (d > 0) {
-                    density += d * d;
-                    near_density += d * d * d;
-                }
-            }
-        }
-    }
-
-    pressure = DENSITY_STRENGTH * (density - DENSITY_REST);
-    near_pressure = NEAR_DENSITY_STRENGTH * near_density;
-
-    double d_x = 0;
-    double d_y = 0;
-    for (int64_t y = bin_y - 1; y <= bin_y + 1; y++) {
-        for (int64_t x = bin_x - 1; x <= bin_x + 1; x++) {
-            int64_t bin_idx = bin_coords_to_index(x, y);
-            // Skip bins beyond left, right, top, and bottom side.
-            if (!valid_bin_index(x, y)) { continue; }
-            if (bin_empty(bin_idx)) { continue; }
-
-            int64_t start_index = count[bin_idx] - 1;
-            int64_t end_index = (bin_idx >= (grid_width * grid_height)) ? PCOUNT : count[bin_idx + 1] - 1;
-            for (int64_t j = start_index; j < end_index; j++) {
-                if (idx == j) continue;  // Skip self.
-                double r_x = particles[j].x - particles[idx].x;
-                double r_y = particles[j].y - particles[idx].y;
-                double r = SDL_sqrt((r_x * r_x) + (r_y * r_y));
-                double d = 1 - (r / interaction_radius);
-                // Consider only particles closer than the interaction radius.
-                if (d > 0) {
-                    double D = (dt * dt) * ((pressure * d) + (near_pressure * d * d));
-                    double D_x = D * (r_x / r);
-                    double D_y = D * (r_y / r);
-
-                    particles[j].x += D_x / 2;
-                    particles[j].y += D_y / 2;
-                    d_x -= D_x / 2;
-                    d_y -= D_y / 2;
-                }
-            }
-        }
-    }
-    particles[idx].x += d_x;
-    particles[idx].y += d_y;
-}
-
-void spring_displacements(size_t idx, double dt) {
-    int64_t bin = bin_index(particles[idx].x, particles[idx].y, grid_width, grid_height);
-    int64_t bin_x;
-    int64_t bin_y;
-    bin_index_to_coords(bin, &bin_x, &bin_y);
-    for (int64_t y = bin_y - 1; y <= bin_y + 1; y++) {
-        for (int64_t x = bin_x - 1; x <= bin_x + 1; x++) {
-            int64_t bin_idx = bin_coords_to_index(x, y);
-            // Skip bins beyond left, right, top, and bottom side.
-            if (!valid_bin_index(x, y)) { continue; }
-            if (bin_empty(bin_idx)) { continue; }
-
-            int64_t start_index = count[bin_idx] - 1;
-            int64_t end_index = (bin_idx >= (grid_width * grid_height)) ? PCOUNT : count[bin_idx + 1] - 1;
-            for (int64_t j = start_index; j < end_index; j++) {
-                if (idx == j) continue;  // Skip self.
-                double r_x = particles[j].x - particles[idx].x;
-                double r_y = particles[j].y - particles[idx].y;
-                double r = SDL_sqrt((r_x * r_x) + (r_y * r_y));
-                double d = 1 - (r / interaction_radius);
-                // Consider only particles closer than the interaction radius.
-                if (d > 0) {
-                    double D = (dt * dt) * SPRING_CONSTANT * (1 - SPRING_REST_LENGTH / interaction_radius) * (SPRING_REST_LENGTH - r);
-                    double D_x = D * (r_x / r);
-                    double D_y = D * (r_y / r);
-
-                    particles[idx].x -= D_x / 2;
-                    particles[idx].y -= D_y / 2;
-                    particles[j].x += D_x / 2;
-                    particles[j].y += D_y / 2;
-                }
-            }
-        }
-    }
-}
-
-void iterate(double dt) {
-    // 1. Sort particles for faster neighbour queries.
-    sort_into_bins(particles);
-
-    for (size_t i = 0; i < PCOUNT; i++) {
-        // 2. Apply gravity to velocities.
-        particles[i].vy += GRAVITY * dt;
-
-        // 2.5 Cap velocity.
-        double sign_vx = (0.0 < particles[i].vx) - (particles[i].vx < 0.0);
-        double sign_vy = (0.0 < particles[i].vy) - (particles[i].vy < 0.0);
-        if (SDL_fabs(particles[i].vx) > 3 * GRAVITY) {
-            particles[i].vx = sign_vx * 3 * GRAVITY;
-        }
-        if (SDL_fabs(particles[i].vy) > 3 * GRAVITY) {
-            particles[i].vy = sign_vy * 3 * GRAVITY;
-        }
-
-        // 3. Apply viscosity to velocities.
-        // ...
-
-        // 4. Advance to predicted position.
-        // Saving old position for next velocity computation.
-        double old_x = particles[i].x;
-        double old_y = particles[i].y;
-        {
-            particles[i].x += particles[i].vx * dt;
-            particles[i].y += particles[i].vy * dt;
-        }
-
-        // 5. Adjust springs.
-        // ...
-        // Elasticity only => constant rest length => this step is unnecessary
-
-        // 6. Apply spring displacements.
-        {
-            spring_displacements(i, dt);
-        }
-
-        // 7. Apply double densitiy relaxation displacements.
-        {
-            double_density_relaxation(i, dt);
-        }
-
-        // 8. Resolve collisions.
-        {
-            // NOTE: Velocity of non-particle bodies will always be 0 since
-            // they are fixed in place.
-            double v_rel_x = particles[i].vx * dt /* - (v_body_x * dt) */;
-            double v_rel_y = particles[i].vy * dt /* - (v_body_y * dt) */;
-
-            // Window bounds (X).
-            if (particles[i].x < 0 || particles[i].x >= WINDOW_WIDTH) {
-                // v_normal = dot(v_rel, nor) * nor
-                double v_normal_x = -v_rel_x;
-                double v_normal_y = 0;
-                // v_tangent = v_rel - v_normal
-                double v_tangent_x = 0;
-                double v_tangent_y = v_rel_y;
-
-                particles[i].x += v_normal_x - COLLISION_FRICTION * v_tangent_x;
-                particles[i].y += v_normal_y - COLLISION_FRICTION * v_tangent_y;
-            }
-
-            // Window bounds (Y).
-            if (particles[i].y < 0 || particles[i].y >= WINDOW_HEIGHT) {
-                // v_normal = dot(v_rel, nor) * nor
-                double v_normal_x = 0;
-                double v_normal_y = -v_rel_y;
-                // v_tangent = v_rel - v_normal
-                double v_tangent_x = v_rel_x;
-                double v_tangent_y = 0;
-
-                particles[i].x += v_normal_x - COLLISION_FRICTION * v_tangent_x;
-                particles[i].y += v_normal_y - COLLISION_FRICTION * v_tangent_y;
-            }
-
-            // Extract any particles still outside window bounds (e.g. those
-            // near corners.)
-            particles[i].x = SDL_clamp(particles[i].x, 0, WINDOW_WIDTH);
-            particles[i].y = SDL_clamp(particles[i].y, 0, WINDOW_HEIGHT);
-        }
-
-        // 9. Compute next velocity.
-        particles[i].vx = (particles[i].x - old_x) / dt;
-        particles[i].vy = (particles[i].y - old_y) / dt;
-    }
 }
 
 
@@ -383,6 +200,7 @@ void iterate(double dt) {
 
 SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
 {
+    SDL_Log("\x1b[2J"); // Clear screen.
     SDL_SetAppMetadata("CSCI40460U-FINAL", "1.0", "net.ontariotechu.jaime.barillas.CSCI4060U-FINAL");
     SDL_SetHint(SDL_HINT_RENDER_VSYNC, "1");
 
@@ -403,24 +221,46 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     return SDL_APP_CONTINUE;
 }
 
-SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
+SDL_AppResult SDL_AppEvent(void *_, SDL_Event *event)
 {
     if (event->type == SDL_EVENT_QUIT) {
         return SDL_APP_SUCCESS;
     }
+    if (event->type == SDL_EVENT_KEY_DOWN) {
+        switch (event->key.scancode) {
+            case SDL_SCANCODE_SPACE:
+                draw_ui = !draw_ui;
+            default:
+                break;
+        }
+    }
+    switch (event->type) {
+        case SDL_EVENT_MOUSE_MOTION:
+            mu_input_mousemove(ui, event->motion.x, event->motion.y);
+            break;
+        case SDL_EVENT_MOUSE_BUTTON_DOWN:
+            mu_input_mousedown(ui, event->button.x, event->button.y, MU_MOUSE_LEFT);
+            break;
+        case SDL_EVENT_MOUSE_BUTTON_UP:
+            mu_input_mouseup(ui, event->button.x, event->button.y, MU_MOUSE_LEFT);
+            break;
+    }
     return SDL_APP_CONTINUE;
 }
 
-SDL_AppResult SDL_AppIterate(void *appstate)
+SDL_AppResult SDL_AppIterate(void *_)
 {
     uint64_t new_time = SDL_GetTicksNS();
     uint64_t dt = new_time - old_time;
     old_time = new_time;
     SDL_Log("\x1b[H\x1b[0KFPS: %.2f", 1.0e9 / dt);
     SDL_Log("\x1b[0KLast Frame Time: %.2fms", dt / 1.0e6);
+    SDL_Log("\x1b[0KInteraction Radius (H/T): %ld", ctx.interaction_radius);
 
-    iterate(1.0/*dt / 1.0e9*/);
-    draw();
+    // for (int64_t i = 0; i < g_simulation_steps; i++) {
+    //     iterate(1.0 / g_simulation_steps);//dt / (g_simulation_steps * 1.0e9));
+    // }
+    draw(&ctx);
 
     // if ((dt / 1.0e6) < MILLI_PER_FRAME)
     // {
