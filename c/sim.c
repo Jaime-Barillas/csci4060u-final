@@ -17,3 +17,40 @@ void init_particles(SimCtx *ctx) {
   }
 }
 
+void sim_step(SimCtx *ctx, float dt) {
+  vec2s old_pos;
+  for (int64_t i = 0; i < ctx->pcount; i++) {
+    // 2. Apply gravity to velocities.
+    ctx->ps[i].vel = glms_vec2_add(
+      ctx->ps[i].vel,
+      glms_vec2_scale(ctx->gravity, dt)
+    );
+
+    // 4. Advance to predicted position.
+    {
+      // Saving old position for next velocity computation.
+      old_pos = ctx->ps[i].pos;
+      ctx->ps[i].pos = glms_vec2_add(
+        ctx->ps[i].pos,
+        glms_vec2_scale(ctx->ps[i].vel, dt)
+      );
+    }
+
+    // 8. Resolve collisions.
+    {
+      // FIXME: Add linear repulsive force.
+      // Clamp to window bounds.
+      ctx->ps[i].pos.x = SDL_clamp(ctx->ps[i].pos.x, 0, ctx->window_width);
+      ctx->ps[i].pos.y = SDL_clamp(ctx->ps[i].pos.y, 0, ctx->window_height);
+    }
+
+    // 9. Compute next velocity.
+    {
+      ctx->ps[i].vel = glms_vec2_divs(
+        glms_vec2_sub(ctx->ps[i].pos, old_pos),
+        dt
+      );
+    }
+  }
+}
+

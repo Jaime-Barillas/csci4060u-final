@@ -21,6 +21,7 @@
 
 #define WINDOW_WIDTH 640
 #define WINDOW_HEIGHT 480
+#define QUARTER_60FPS (1.0 / 60 / 4)
 
 static SDL_Window *window = NULL;
 static SDL_Renderer *renderer = NULL;
@@ -28,6 +29,7 @@ static SDL_Renderer *renderer = NULL;
 static bool draw_ui;
 static mu_Context *ui;
 static mu_Real ui_pcount;
+static mu_Real ui_time_step;
 static mu_Real ui_sim_steps;
 static mu_Real ui_interaction_radius;
 static mu_Real ui_gravity_x;
@@ -47,6 +49,7 @@ static int text_height(mu_Font _) {
 }
 
 void update_sim_settings(SimCtx *ctx) {
+    ctx->time_step = ui_time_step;
     ctx->sim_steps = (int64_t)ui_sim_steps;
     ctx->gravity.x = ui_gravity_x;
     ctx->gravity.y = ui_gravity_y;
@@ -74,6 +77,7 @@ void initialize(void) {
     draw_ui = true;
     ui->text_width = text_width;
     ui->text_height = text_height;
+    ui_time_step = QUARTER_60FPS * 2;
     ui_sim_steps = 1.0;
     ui_interaction_radius = 30;
     ui_gravity_x = 0.0;
@@ -143,14 +147,16 @@ void draw(SimCtx *ctx) {
             }
 
             mu_layout_row(ui, 2, (int[]){155, 210}, 0);
+            mu_label(ui, "Time step:");
+            mu_slider_ex(ui, &ui_time_step, QUARTER_60FPS, QUARTER_60FPS * 8, QUARTER_60FPS, "%.3fs", MU_OPT_ALIGNCENTER);
             mu_label(ui, "Simulation Steps:");
             mu_slider_ex(ui, &ui_sim_steps, 1.0, 5.0, 1.0, "%.0f", MU_OPT_ALIGNCENTER);
             mu_label(ui, "Interaction Radius:");
             mu_slider_ex(ui, &ui_interaction_radius, 1.0, ctx->window_width * 0.25, 1.0, "%.0f", MU_OPT_ALIGNCENTER);
             mu_label(ui, "Gravity X:");
-            mu_slider_ex(ui, &ui_gravity_x, 0.0, 10, 0.1, "%.1f", MU_OPT_ALIGNCENTER);
+            mu_slider_ex(ui, &ui_gravity_x, -10.0, 10.0, 0.1, "%.1f", MU_OPT_ALIGNCENTER);
             mu_label(ui, "Gravity Y:");
-            mu_slider_ex(ui, &ui_gravity_y, 0.0, 10, 0.1, "%.1f", MU_OPT_ALIGNCENTER);
+            mu_slider_ex(ui, &ui_gravity_y, -10.0, 10.0, 0.1, "%.1f", MU_OPT_ALIGNCENTER);
             mu_label(ui, ""); mu_label(ui, "");
             mu_layout_row(ui, 1, (int[]){365}, 0);
             mu_checkbox(ui, "Show Grid", &ui_draw_grid);
@@ -261,11 +267,10 @@ SDL_AppResult SDL_AppIterate(void *_)
     old_time = new_time;
     SDL_Log("\x1b[H\x1b[0KFPS: %.2f", 1.0e9 / dt);
     SDL_Log("\x1b[0KLast Frame Time: %.2fms", dt / 1.0e6);
-    SDL_Log("\x1b[0KInteraction Radius (H/T): %ld", ctx.interaction_radius);
 
-    // for (int64_t i = 0; i < g_simulation_steps; i++) {
-    //     iterate(1.0 / g_simulation_steps);//dt / (g_simulation_steps * 1.0e9));
-    // }
+    for (int64_t i = 0; i < ctx.sim_steps; i++) {
+        sim_step(&ctx, ctx.time_step);
+    }
     draw(&ctx);
 
     // if ((dt / 1.0e6) < MILLI_PER_FRAME)

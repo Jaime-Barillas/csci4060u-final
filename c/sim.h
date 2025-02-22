@@ -23,8 +23,11 @@ typedef struct SimCtx_S {
   int64_t   grid_height;
   int64_t   cell_count;
   int64_t  *cell_pcount;
+
+  float     time_step;
 } SimCtx;
 
 void init_particles(SimCtx *ctx);
+void sim_step(SimCtx *ctx, float dt);
 
 #endif
