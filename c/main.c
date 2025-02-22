@@ -55,12 +55,17 @@ void update_sim_settings(SimCtx *ctx) {
     ctx->grid_width = (int64_t)SDL_ceil((float)ctx->window_width / ctx->cell_size);
     ctx->grid_height = (int64_t)SDL_ceil((float)ctx->window_height / ctx->cell_size);
 
-    if (ctx->ps) { free(ctx->ps); }
-    if (ctx->cell_pcount) { free(ctx->cell_pcount); }
-    ctx->pcount = (int64_t)ui_pcount;
-    ctx->ps = malloc(ctx->pcount * sizeof(Particle));
-    ctx->cell_count = ctx->grid_width * ctx->grid_height;
-    ctx->cell_pcount = malloc(ctx->cell_count * sizeof(int64_t));
+    if (ctx->pcount != (int64_t)ui_pcount) {
+        if (ctx->ps) { free(ctx->ps); }
+        ctx->pcount = (int64_t)ui_pcount;
+        ctx->ps = malloc(ctx->pcount * sizeof(Particle));
+        init_particles(ctx);
+    }
+    if (ctx->cell_count != (ctx->grid_width * ctx->grid_height)) {
+        if (ctx->cell_pcount) { free(ctx->cell_pcount); }
+        ctx->cell_count = ctx->grid_width * ctx->grid_height;
+        ctx->cell_pcount = malloc(ctx->cell_count * sizeof(int64_t));
+    }
 }
 
 void initialize(void) {
@@ -73,13 +78,14 @@ void initialize(void) {
     ui_interaction_radius = 30;
     ui_gravity_x = 0.0;
     ui_gravity_y = 0.0;
-    ui_pcount = 1000;
+    ui_pcount = 100;
     ui_draw_grid = 1;
 
     ctx.window_width = WINDOW_WIDTH;
     ctx.window_height = WINDOW_HEIGHT;
     update_sim_settings(&ctx);
 
+    init_particles(&ctx);
     old_time = SDL_GetTicksNS();
 }
 

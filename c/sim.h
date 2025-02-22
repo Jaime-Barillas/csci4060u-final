@@ -25,4 +25,6 @@ typedef struct SimCtx_S {
   int64_t  *cell_pcount;
 } SimCtx;
 
+void init_particles(SimCtx *ctx);
+
 #endif
