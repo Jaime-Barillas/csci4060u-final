@@ -13,3 +13,21 @@
    7. Resolve collisions.
    8. Compute next velocity.
 
+---
+
+Project: Basic _parallelized_ particle based fluid simulator with OpenMP.
+Parallelism in: particle calculations.
+Plan:
+* The are many for loops in the code. Use `parallel for`.
+  * Potentially `parallel for collapse`.
+* Try manually batching the particle computations.
+  * With use of critical sections or other OpenMP features.
+* Look into OpenMP SIMD directives.
+* Compare timings for variants.
+
+Stretch Goal:
+* [Pony](https://www.ponylang.io/) implementation.
+  * Actor model.
+  * Type level "safety" annotations (reference capabilities)
+  * Report on timings, ease of implementation, or benefit of using Pony.
+
