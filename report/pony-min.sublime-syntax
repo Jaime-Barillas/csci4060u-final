@@ -1,0 +1,80 @@
+%YAML 1.2
+---
+name: pony
+version: 2
+scope: source.pony
+
+file_extensions:
+  - pony
+
+contexts:
+  main:
+    - match: \b(actor|class|struct|new|fun|be|var|let|embed|type|interface|trait|primitive|object)\b
+      scope: keyword.other.pony
+
+      # Control Flow
+    - match: \b(if|then|elseif|else|end|match|while|do|repeat|until|for|in|return|continue|break|try|error)\b
+      scope: keyword.control.pony
+
+      # Reference Capabilities & Other Keywords
+    - match: \b(iso|trn|val|ref|box|tag|as|true|false|where|recover|consume|as)\b
+      scope: keyword.other.pony
+
+      # Operators
+    - match: (!|\.>|\^|@|&|=>|=|~|\?|\+|-|(?<!/)\*(?!/)|(?<!\*)/(?!(/|\*))|%|%%|<<|>>|==|!=|<|<=|>|>=)
+      scope: keyword.operator.pony
+    - match: \b(and|or|xor|not|is|isnt)\b
+      scope: keyword.operator.word.pony
+
+      # Identifiers
+    - match: '_?[A-Z][_a-z0-9]*'
+      scope: entity.name.type
+    - match: '[_a-z0-9]+(?=\()'
+      scope: variable.function.pony
+
+      # Comments
+    - match: '//'
+      push: comment-line
+    - match: '/\*'
+      push: comment-block
+
+    # Strings & Characters
+    - match: '"(?!")'
+      push: string
+    - match: '"""'
+      push: docstring
+    - match: "'"
+      push: char
+
+    # Numbers
+    - match: '[0-9]+(\.[0-9]+)?'
+      scope: constant.numeric.pony
+
+  comment-line:
+    - meta_scope: comment.line.pony
+    - match: '\n'
+      pop: true
+
+  comment-block:
+    - meta_scope: comment.block.pony
+    - match: '\*/'
+      pop: true
+
+  string:
+    - meta_scope: string.quoted.double.pony
+    - match: '\\.'
+      scope: constant.character.escape.pony
+    - match: '"'
+      pop: true
+
+  docstring:
+    - meta_scope: string.quoted.triple.pony
+    - match: '"""'
+      pop: true
+
+  char:
+    - meta_scope: string.quoted.single.pony
+    - match: '\\.'
+      scope: constant.character.escape.pony
+    - match: "'"
+      pop: true
