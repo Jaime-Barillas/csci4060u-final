@@ -1,6 +1,22 @@
-#let anchor-regex = regex(".+ANCHOR(?:_END)?:\s*([\w_-]+)")
-#let anchor-start = regex("ANCHOR:")
-#let cache        = state("code.insert.cache", (:))
+#let anchor-regex     = regex(".+ANCHOR(?:_END)?:\s*([\w_-]+)")
+#let anchor-start     = regex("ANCHOR:")
+#let line-end-regex   = regex("\r?\n")
+#let leading-ws-regex = regex("(?-m)^\s*") // Ensure no multi-line mode, match at start of string.
+#let cache = state("code.insert.cache", (:))
+
+#let trim-whitespace(text) = {
+  // Strip leading whitespace on each line to ensure consistent indentation.
+  // NOTE: The underlying regex engine does not support look-around. https://docs.rs/regex/latest/regex/
+  // 1. Determine the number of spaces or tabs leading the first non-whitespace
+  //    character on the first line.
+  // 2. Create a regex that matches that number of whitespaces.
+  // 3. Trim surrounding whitespace.
+  // 4. Replace leading whitespace on each line with the empty string.
+  let leading-ws-count = text.trim(line-end-regex).find(leading-ws-regex).len()
+  let n-leading-ws-regex = regex("(?m)^\s{" + str(leading-ws-count) + "}")
+
+  return text.trim().replace(n-leading-ws-regex, "")
+}
 
 #let extract-all-sections(file-path) = {
   // We want to handle nested anchors so we need to manually extract code
@@ -59,14 +75,40 @@
     }
 
     let text = source.slice(section.start, section.end)
-    section.insert("text", text.trim())
+    section.insert("text", trim-whitespace(text))
     sections.insert(anchor-name, section)
   }
 
   return sections
 }
 
-#let insert(file-path, anchor: "<anchor-name>", lang: "c", wrap-in-figure: true, caption: none) = {
+/// Inserts the contents of an anchor section from the file located at
+/// `file-path`. Attaches a label keyed by `<file-path>:<anchor>` with
+/// all leading '../' removed and intermediate '/' replaced with ':'
+/// (`wrap-in-figure` must be true). Anchor sections are delimited with
+/// `ANCHOR: <name>` and `ANCHOR_END: <name>` in comments. Anchors can be
+/// nested (inner anchor comments will be included in the extracted code,
+/// TODO: Strip out anchor comment lines).
+#let insert(
+  /// Path to the file containing the anchor section to insert.
+  /// -> str
+  file-path,
+  /// The name of the specific anchor to insert.
+  /// -> str
+  anchor,
+  /// Overriding name of the generated label.
+  /// -> str
+  label-key: none,
+  /// The language of the inserted code.
+  /// -> str
+  lang: "c",
+  /// Whether the code should be wrapped in a figure. Must be true to generate
+  /// a label.
+  /// -> bool
+  wrap-in-figure: true,
+  /// An optional caption for the code figure. Only takes effect if
+  /// `wrap-in-figure` is true.
+  caption: none) = {
   // Insert does 3 things:
   // 1. Process and cache file if necessary.
   // 2. Extract the desired anchor section.
@@ -84,17 +126,26 @@
     return prev
   })
 
+  // FIXME: Better label-key default. Handle paths like: test/../code.c
+  //        Better to wait until typst has a Path type so edge cases are easier
+  //        to handle?
+  if label-key == none {
+    label-key = file-path.replace("../", "").replace("/", ":") + ":" + anchor
+  }
   let raw-code = context {
     let section = cache.get().at(file-path, default: (:)).at(anchor, default: (:))
     if "text" not in section {
       panic("This shouldn't happen! `text` not found in section dict for " + anchor + " of " + file-path)
     }
 
-    let code = raw(section.at("text", default: none), lang: lang)
+    let code = raw(section.at("text", default: none), lang: lang, block: true, align: left)
     if wrap-in-figure {
-      return figure(code, caption: caption)
+      // Labels can only be attached in markup mode, not code mode. We wrap the
+      // figure in [] to switch to markup mode and apply the label there.
+      // See last sentence of: https://typst.app/docs/reference/foundations/label/#syntax
+      [#figure(code, caption: caption) #label(label-key)]
     } else {
-      return code
+      code
     }
   }
   if raw-code == none {

@@ -6,7 +6,7 @@
   abstract: [
     lorem freaking ipsum. #lorem(90)
   ],
-  authors: ((name: "Jaime Barillas", organization: "OntarioTech University",),),
+  authors: ((name: "Jaime Barillas", organization: "Ontario Tech University",),),
   code-font: "Fantasque Sans Mono"
 )
 
@@ -14,8 +14,20 @@
 
 = Introduction
 
-#code.insert("../pony/main.pony", anchor: "SDL_FFI", lang: "pony", caption: [Function wrappers...])
-#code.insert("../pony/main.pony", anchor: "pinning", lang: "pony", caption: [To run on the main thread...])
+#code.insert(
+  "../pony/main.pony",
+  "SDL_FFI",
+  lang: "pony",
+  caption: [Function wrappers...]
+)
+#code.insert(
+  "../pony/main.pony",
+  "pinning",
+  lang: "pony",
+  caption: [To run on the main thread...],
+)
+
+See @pony:main.pony:pinning for cool code.
 
 #lorem(130)
 ```pony
