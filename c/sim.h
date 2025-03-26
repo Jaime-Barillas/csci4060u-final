@@ -17,6 +17,7 @@ typedef struct SimCtx_S {
   int64_t   window_width;
   int64_t   window_height;
   Particle *ps;
+  Particle *ps2;
   int64_t   pcount;
   int64_t   cell_size;
   int64_t   grid_width;
@@ -24,6 +25,9 @@ typedef struct SimCtx_S {
   int64_t   cell_count;
   int64_t  *cell_pcount;
 
+  float     rest_density;
+  float     pressure_mult;
+  float     collision_damping;
   float     time_step;
 } SimCtx;
 

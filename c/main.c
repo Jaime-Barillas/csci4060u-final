@@ -19,21 +19,24 @@
 #include <microui.h>
 #include "sim.h"
 
-#define WINDOW_WIDTH 640
+#define WINDOW_WIDTH 768
 #define WINDOW_HEIGHT 480
 #define QUARTER_60FPS (1.0 / 60 / 4)
 
 static SDL_Window *window = NULL;
 static SDL_Renderer *renderer = NULL;
 
-static bool draw_ui;
 static mu_Context *ui;
 static mu_Real ui_pcount;
 static mu_Real ui_time_step;
 static mu_Real ui_sim_steps;
 static mu_Real ui_interaction_radius;
+static mu_Real ui_rest_density;
+static mu_Real ui_pressure_mult;
+static mu_Real ui_collision_damping;
 static mu_Real ui_gravity_x;
 static mu_Real ui_gravity_y;
+static bool draw_ui;
 static int ui_draw_grid;
 
 static SimCtx ctx;
@@ -54,14 +57,20 @@ void update_sim_settings(SimCtx *ctx) {
     ctx->gravity.x = ui_gravity_x;
     ctx->gravity.y = ui_gravity_y;
     ctx->interaction_radius = (int64_t)ui_interaction_radius;
+    ctx->rest_density = ui_rest_density;
+    ctx->pressure_mult = ui_pressure_mult;
+    ctx->collision_damping = ui_collision_damping;
     ctx->cell_size = ctx->interaction_radius * 2;
     ctx->grid_width = (int64_t)SDL_ceil((float)ctx->window_width / ctx->cell_size);
     ctx->grid_height = (int64_t)SDL_ceil((float)ctx->window_height / ctx->cell_size);
 
-    if (ctx->pcount != (int64_t)ui_pcount) {
+    int64_t pc = SDL_lroundf(ui_pcount);
+    if (ctx->pcount != pc) {
         if (ctx->ps) { free(ctx->ps); }
-        ctx->pcount = (int64_t)ui_pcount;
+        if (ctx->ps2) { free(ctx->ps2); }
+        ctx->pcount = pc;
         ctx->ps = malloc(ctx->pcount * sizeof(Particle));
+        ctx->ps2 = malloc(ctx->pcount * sizeof(Particle));
         init_particles(ctx);
     }
     if (ctx->cell_count != (ctx->grid_width * ctx->grid_height)) {
@@ -77,9 +86,12 @@ void initialize(void) {
     draw_ui = true;
     ui->text_width = text_width;
     ui->text_height = text_height;
-    ui_time_step = QUARTER_60FPS * 2;
+    ui_time_step = QUARTER_60FPS * 4;
     ui_sim_steps = 1.0;
     ui_interaction_radius = 30;
+    ui_rest_density = 10;
+    ui_pressure_mult = 4.0;
+    ui_collision_damping = 0.9;
     ui_gravity_x = 0.0;
     ui_gravity_y = 0.0;
     ui_pcount = 100;
@@ -89,18 +101,17 @@ void initialize(void) {
     ctx.window_height = WINDOW_HEIGHT;
     update_sim_settings(&ctx);
 
-    init_particles(&ctx);
     old_time = SDL_GetTicksNS();
 }
 
 void draw(SimCtx *ctx) {
-    SDL_SetRenderDrawColor(renderer, 96, 61, 31, 255);
+    SDL_SetRenderDrawColor(renderer, 48, 30, 15, 255);
     SDL_RenderClear(renderer);
     SDL_FRect rect;
 
     // Render grid.
     if (ui_draw_grid != 0) {
-        SDL_SetRenderDrawColor(renderer, 255, 255, 255, 16);
+        SDL_SetRenderDrawColor(renderer, 255, 255, 255, 32);
         rect.y = 0;
         rect.w = 2;
         rect.h = WINDOW_HEIGHT;
@@ -118,10 +129,11 @@ void draw(SimCtx *ctx) {
     }
 
     // Render the particles
-    SDL_SetRenderDrawColor(renderer, 55, 75, 178, 255);
     rect.w = 10;
     rect.h = 10;
     for (int i = 0; i < ctx->pcount; i++) {
+        if (i == 25) {SDL_SetRenderDrawColor(renderer, 255, 205, 208, 255);}
+        else {SDL_SetRenderDrawColor(renderer, 55, 75, 178, 255);}
         rect.x = ctx->ps[i].pos.x - (rect.w / 2.0);
         rect.y = ctx->ps[i].pos.y - (rect.h / 2.0);
         SDL_RenderFillRect(renderer, &rect);
@@ -140,10 +152,10 @@ void draw(SimCtx *ctx) {
                 ui_pcount = SDL_max(ui_pcount - 100, 1);
             }
             if (mu_number_ex(ui, &ui_pcount, 0.2, "%.0f", MU_OPT_ALIGNCENTER)) {
-                ui_pcount = SDL_clamp(ui_pcount, 1, 3000);
+                ui_pcount = SDL_clamp(ui_pcount, 1, 2000);
             }
             if (mu_button(ui, "+100")) {
-                ui_pcount = SDL_min(ui_pcount + 100, 3000);
+                ui_pcount = SDL_min(ui_pcount + 100, 2000);
             }
 
             mu_layout_row(ui, 2, (int[]){155, 210}, 0);
@@ -153,6 +165,12 @@ void draw(SimCtx *ctx) {
             mu_slider_ex(ui, &ui_sim_steps, 1.0, 5.0, 1.0, "%.0f", MU_OPT_ALIGNCENTER);
             mu_label(ui, "Interaction Radius:");
             mu_slider_ex(ui, &ui_interaction_radius, 1.0, ctx->window_width * 0.25, 1.0, "%.0f", MU_OPT_ALIGNCENTER);
+            mu_label(ui, "Rest Density:");
+            mu_slider(ui, &ui_rest_density, 0.0, 20.0);
+            mu_label(ui, "Pressure Mult:");
+            mu_slider(ui, &ui_pressure_mult, 0.0, 50.0);
+            mu_label(ui, "Collision Damping:");
+            mu_slider_ex(ui, &ui_collision_damping, 0.0, 1.0, 0.1, "%.1f", MU_OPT_ALIGNCENTER);
             mu_label(ui, "Gravity X:");
             mu_slider_ex(ui, &ui_gravity_x, -10.0, 10.0, 0.1, "%.1f", MU_OPT_ALIGNCENTER);
             mu_label(ui, "Gravity Y:");
@@ -199,8 +217,6 @@ void draw(SimCtx *ctx) {
         }
     }
 
-    // TODO: Move to iterate function?
-    update_sim_settings(ctx);
     SDL_RenderPresent(renderer);
 }
 
@@ -268,6 +284,7 @@ SDL_AppResult SDL_AppIterate(void *_)
     SDL_Log("\x1b[H\x1b[0KFPS: %.2f", 1.0e9 / dt);
     SDL_Log("\x1b[0KLast Frame Time: %.2fms", dt / 1.0e6);
 
+    update_sim_settings(&ctx);
     for (int64_t i = 0; i < ctx.sim_steps; i++) {
         sim_step(&ctx, ctx.time_step);
     }
