@@ -1,49 +1,34 @@
-project('final', 'c',
+project('final', 'cpp',
   version : '0.1',
   default_options : [
-    'c_std=c11',
+    'cpp_std=c++17',
     'warning_level=3',
     'default_library=shared'
   ]
 )
 
-cmake = import('cmake')
 
 
 # ##############
 # Shared Dependencies
 # ##############
-lib_type = get_option('default_library')
-sdl3_opts = cmake.subproject_options()
-sdl3_opts.add_cmake_defines({
-  'SDL_SHARED': lib_type == 'shared',
-  'SDL_STATIC': lib_type == 'static',
-  'SDL_TEST_LIBRARY': false,
-  'CMAKE_POSITION_INDEPENDENT_CODE': true,  # For Linux
-})
-sdl3 = cmake.subproject('sdl', options: sdl3_opts)
-message('CMake targets:\n - ' + '\n - '.join(sdl3.target_list()))
-sdl3_dep = sdl3.dependency(lib_type == 'shared' ? 'SDL3_shared' : 'SDL3_static')
-
+sdl3 = dependency('sdl3')
 microui = dependency('microui')
 
 
 
 # ##############
-# C Program
+# CPP Program
 # ##############
-cglm_dep = dependency('cglm', fallback : ['cglm', 'cglm_dep'])
-c_exe = 'final-c'
-c_sources = files(
-  'c/main.c',
-  'c/util.c',
-  'c/sim.c',
+cpp_exe = 'final-cpp'
+cpp_sources = files(
+  'cpp/main.cpp',
 )
-executable(c_exe,
-  c_sources,
-  c_args: ['-fopenmp'],
+executable(cpp_exe,
+  cpp_sources,
+  cpp_args: ['-fopenmp'],
   link_args: ['-fopenmp'],
-  dependencies: [sdl3_dep, cglm_dep, microui],
+  dependencies: [sdl3, microui],
 )
 
 
