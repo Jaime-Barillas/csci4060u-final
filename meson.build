@@ -3,7 +3,7 @@ project('final', 'cpp',
   default_options : [
     'cpp_std=c++17',
     'warning_level=3',
-    'default_library=shared'
+    'default_library=static'
   ]
 )
 
@@ -23,11 +23,10 @@ microui = dependency('microui')
 cpp_exe = 'final-cpp'
 cpp_sources = files(
   'cpp/main.cpp',
+  'cpp/ui.cpp',
 )
 executable(cpp_exe,
   cpp_sources,
-  cpp_args: ['-fopenmp'],
-  link_args: ['-fopenmp'],
   dependencies: [sdl3, microui],
 )
 
