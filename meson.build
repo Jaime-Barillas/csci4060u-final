@@ -18,6 +18,7 @@ project('final', 'cpp',
 # meson uses a '.a' extension by default.
 sdl3 = dependency('sdl3')
 microui = dependency('microui')
+
 libui_incdirs = include_directories('ui')
 libui_srcs = files('ui/ui.cpp')
 libui_name_suffix = []
@@ -30,7 +31,8 @@ endif
 libui = library('ui',
   libui_srcs,
   include_directories: libui_incdirs,
-  dependencies: [sdl3, microui]
+  name_suffix: libui_name_suffix,
+  dependencies: [sdl3.as_link_whole(), microui.as_link_whole()],
 )
 
 
@@ -42,6 +44,9 @@ cpp_exe = 'final-cpp'
 cpp_sources = files(
   'cpp/main.cpp',
 )
+# Provide sdl3 and microui as dependencies despite libui containing them.
+# This ensures the necessary deps are linked against for SDL3 (using
+# partial_dependency() does not seem to include them).
 executable(cpp_exe,
   cpp_sources,
   include_directories: [libui_incdirs],
