@@ -31,3 +31,10 @@ Stretch Goal:
   * Type level "safety" annotations (reference capabilities)
   * Report on timings, ease of implementation, or benefit of using Pony.
 
+NOTE: On fedora, install for SDL3:
++ libudev-devel (should be present outside docker container.)
++ dbus-devel (should be present outside docker container.)
++ pipewire-devel (should be present outside docker container.)
++ wayland-devel
++ libxkbcommon-devel
++ libglvnd-devel

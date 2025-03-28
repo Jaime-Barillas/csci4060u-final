@@ -12,8 +12,26 @@ project('final', 'cpp',
 # ##############
 # Shared Dependencies
 # ##############
+# SDL3, microui, and the libui Pony wrapper library are compiled into a single
+# library dependency to accommodate how Pony links with static libraries. Pony
+# expects the static library to end with the '.lib' extension on windows but
+# meson uses a '.a' extension by default.
 sdl3 = dependency('sdl3')
 microui = dependency('microui')
+libui_incdirs = include_directories('ui')
+libui_srcs = files('ui/ui.cpp')
+libui_name_suffix = []
+
+# Use standard '.lib' extension when compiling static libraries on windows.
+if host_machine.system() == 'windows' and get_option('default_library') == 'static'
+  libui_name_suffix = 'lib'
+endif
+
+libui = library('ui',
+  libui_srcs,
+  include_directories: libui_incdirs,
+  dependencies: [sdl3, microui]
+)
 
 
 
@@ -23,11 +41,12 @@ microui = dependency('microui')
 cpp_exe = 'final-cpp'
 cpp_sources = files(
   'cpp/main.cpp',
-  'cpp/ui.cpp',
 )
 executable(cpp_exe,
   cpp_sources,
-  dependencies: [sdl3, microui],
+  include_directories: [libui_incdirs],
+  link_with: [libui],
+  dependencies: [sdl3, microui]
 )
 
 
