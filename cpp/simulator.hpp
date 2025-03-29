@@ -10,6 +10,8 @@
 
 constexpr float PARTICLE_SIZE = 8;
 constexpr float BOUND_DAMPENING = -0.8f;
+constexpr float SUPPORT_RADIUS = 96.0f;
+constexpr float REST_DENSITY = 4.0f;
 
 class Simulator {
   float bound_x;

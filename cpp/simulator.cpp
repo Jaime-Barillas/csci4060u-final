@@ -2,6 +2,7 @@
 #include <SDL3/SDL_timer.h>
 
 #include "simulator.hpp"
+#include "vec.hpp"
 
 Simulator::Simulator(
   float bound_x,
@@ -43,25 +44,70 @@ void Simulator::reset_particles(int32_t particle_count) {
 }
 
 void Simulator::integrate(float dt) {
+  // 1. Apply gravity.
   for (auto &p : ps) {
     p.vel.y += gravity_y * dt;
+  }
+
+  // 2. Apply viscosity.
+
+  // 3. Advance position.
+  for (auto &p : ps) {
+    p.prev_pos = p.pos;
     p.pos += p.vel * dt;
   }
+  // 4. Adjust viscosity springs.
 
-  float q;
+  // 5. Apply spring displacements.
+
+  // 6. Double Density Relaxation.
+  float distance;
+  float contribution;
+  Vec distance_vec;
+  Vec accumulated_displacement;
+  Vec displacement_vec;
   for (size_t i = 0; i < ps.size(); i++) {
     ps[i].density = 0.0f;
+    ps[i].near_density = 0.0f;
+    accumulated_displacement = {0, 0};
+
     for (size_t j = 0; j < ps.size(); j++) {
       if (i == j) { continue; }
-      q = (ps[i].pos - ps[j].pos).length() / 16.0f;
-      if (q < 1.0f) {
-        ps[i].density += (1 - q) * (1 - q);
+      distance_vec = ps[i].pos - ps[j].pos;
+      distance = distance_vec.length() / SUPPORT_RADIUS;
+      if (distance < 1.0f) {
+        contribution = 1.0f - distance;
+        ps[i].density += contribution * contribution;
+        ps[i].near_density += ps[i].density * contribution;
       }
     }
+
+    ps[i].pressure = 0.004 * (ps[i].density - REST_DENSITY);
+    ps[i].near_pressure = 0.01 * ps[i].near_density;
+
+    for (size_t j = 0; j < ps.size(); j++) {
+      if (i == j) { continue; }
+      distance_vec = ps[j].pos - ps[i].pos;
+      distance = distance_vec.length() / SUPPORT_RADIUS;
+      if (distance < 1.0f) {
+        contribution = 1.0f - distance;
+        displacement_vec = distance_vec.normalized() * (dt * dt) * ((ps[i].pressure * contribution) + (ps[i].near_pressure * contribution * contribution));
+        displacement_vec /= 2.0f;
+        ps[j].pos += displacement_vec;
+        accumulated_displacement -= displacement_vec;
+      }
+    }
+
+    ps[i].pos += accumulated_displacement;
   }
 
-  // Bound collisions.
   for (auto &p : ps) {
+    // 7. Collisions.
+
+    // 8. Compute next velocity
+    p.vel = p.pos - p.prev_pos;
+
+    // 9. Boundary checks.
     if (p.pos.x < 0.0f || p.pos.x > bound_x) {
       p.pos.x = SDL_clamp(p.pos.x, 0.0f, bound_x);
       p.vel.x *= BOUND_DAMPENING;

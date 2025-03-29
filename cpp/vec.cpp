@@ -9,5 +9,17 @@ void Vec::operator+=(const Vec &rhs) {
   x += rhs.x;
   y += rhs.y;
 }
+void Vec::operator-=(const Vec &rhs) {
+  x -= rhs.x;
+  y -= rhs.y;
+}
+void Vec::operator/=(float scalar) {
+  x /= scalar;
+  y /= scalar;
+}
 
 float Vec::length() const { return SDL_sqrtf((x * x) + (y * y)); }
+Vec Vec::normalized() const {
+  float len = length();
+  return {x / len, y / len};
+}
