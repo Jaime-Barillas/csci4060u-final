@@ -30,12 +30,13 @@ void Simulator::reset_particles(int32_t particle_count) {
   float next_multiple = SDL_ceilf(SDL_sqrtf(pcount / (16.0f * 10.0f)));
   int32_t cols = (int32_t)(next_multiple * 16.0f);
   int32_t rows = (int32_t)(next_multiple * 10.0f);
+  float pos_step = PARTICLE_SIZE * 1.25f;
 
   pcount = particle_count;
   ps.resize(pcount);
   for (size_t i = 0; i < ps.size(); i++) {
-    float x = (bound_x / 2.0f) + (i % cols) * 15.0f - (cols / 2) * 15.0f;
-    float y = (bound_y / 2.0f) + (i / cols) * 15.0f - (rows / 2) * 15.0f;
+    float x = (bound_x / 2.0f) + (i % cols) * pos_step - (cols / 2) * pos_step;
+    float y = (bound_y / 2.0f) + (i / cols) * pos_step - (rows / 2) * pos_step;
     ps[i].pos = {x, y};
     ps[i].vel = {0.0f, 0.0f};
   }
@@ -87,10 +88,11 @@ float Simulator::simulate() {
 
 void Simulator::draw(SDL_Renderer *r) {
   SDL_FRect rect;
+  float half_psize = PARTICLE_SIZE / 2.0f;
 
   SDL_SetRenderDrawColor(r, 228, 228, 228, 255);
   for (auto &p : ps) {
-    rect = {p.pos.x - 5.0f, p.pos.y - 5.0f, 10, 10};
+    rect = {p.pos.x - half_psize, p.pos.y - half_psize, PARTICLE_SIZE, PARTICLE_SIZE};
     SDL_RenderFillRect(r, &rect);
   }
 }

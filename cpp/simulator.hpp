@@ -8,6 +8,7 @@
 
 #include "particle.hpp"
 
+constexpr float PARTICLE_SIZE = 8;
 constexpr float BOUND_DAMPENING = -0.8f;
 
 class Simulator {
