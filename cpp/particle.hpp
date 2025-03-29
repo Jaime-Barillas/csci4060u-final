@@ -6,6 +6,7 @@
 struct Particle {
   Vec pos;
   Vec vel;
+  float density;
 };
 
 #endif

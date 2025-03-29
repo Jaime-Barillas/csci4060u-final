@@ -82,7 +82,7 @@ void Ui::enqueue_draw_cmds() {
 
     int statistics_row[]{155, 210};
     mu_layout_row(ctx, 2, statistics_row, 0);
-    snprintf(fmtbuf, sizeof(fmtbuf), "%.0f(%.2f)", 1.0f / frame_time, frame_time);
+    snprintf(fmtbuf, sizeof(fmtbuf), "%.0f(%.4f)", 1.0f / frame_time, frame_time);
     mu_label(ctx, "FPS:");
     mu_label(ctx, fmtbuf);
 

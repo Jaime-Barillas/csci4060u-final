@@ -47,6 +47,18 @@ void Simulator::integrate(float dt) {
     p.pos += p.vel * dt;
   }
 
+  float q;
+  for (size_t i = 0; i < ps.size(); i++) {
+    ps[i].density = 0.0f;
+    for (size_t j = 0; j < ps.size(); j++) {
+      if (i == j) { continue; }
+      q = (ps[i].pos - ps[j].pos).length() / 16.0f;
+      if (q < 1.0f) {
+        ps[i].density += (1 - q) * (1 - q);
+      }
+    }
+  }
+
   // Bound collisions.
   for (auto &p : ps) {
     if (p.pos.x < 0.0f || p.pos.x > bound_x) {
