@@ -7,7 +7,9 @@
 #include <SDL3/SDL_init.h>
 #include <SDL3/SDL_log.h>
 #include <SDL3/SDL_main.h>
+#include <SDL3/SDL_rect.h>
 #include <SDL3/SDL_render.h>
+#include <SDL3/SDL_stdinc.h>
 #include <SDL3/SDL_video.h>
 
 #include "ui.hpp"
@@ -24,13 +26,19 @@ int main(int, char**) {
     exit(1);
   }
 
-  if (!SDL_CreateWindowAndRenderer("CSCI4060U - Fluid2D", WIDTH, HEIGHT, 0, &w, &r)) {
+  SDL_Rect rect;
+  SDL_DisplayID display = SDL_GetPrimaryDisplay();
+  SDL_GetDisplayUsableBounds(display, &rect);
+  int32_t window_height = (int32_t)SDL_floorf(rect.h / HEIGHT) * HEIGHT;
+  int32_t window_width = (window_height * 16) / 10;
+  if (!SDL_CreateWindowAndRenderer("CSCI4060U - Fluid2D", window_width, window_height, 0, &w, &r)) {
     SDL_Log("Failed to create window + renderer: %s\n", SDL_GetError());
     exit(1);
   }
 
   // Support opacity.
   SDL_SetRenderDrawBlendMode(r, SDL_BLENDMODE_BLEND);
+  SDL_SetRenderLogicalPresentation(r, WIDTH, HEIGHT, SDL_LOGICAL_PRESENTATION_INTEGER_SCALE);
 
   // Main Loop
   Ui ui{};
@@ -42,6 +50,7 @@ int main(int, char**) {
     while (SDL_PollEvent(&ev)) {
       if (ev.type == SDL_EVENT_QUIT) { should_quit = true; }
 
+      SDL_ConvertEventToRenderCoordinates(r, &ev);
       switch (ev.type) {
       case SDL_EVENT_QUIT:
         should_quit = true;
