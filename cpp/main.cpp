@@ -77,6 +77,13 @@ int main(int, char**) {
     SDL_SetRenderDrawColor(r, 48, 34, 24, 255);
     SDL_RenderClear(r);
 
+    sim.set_time_step(ui.time_step);
+    sim.set_sim_steps((int32_t)ui.sim_steps);
+    sim.set_gravity_y(-ui.gravity_y);
+    if (ui.pcount != sim.get_pcount()) {
+      sim.reset_particles(ui.pcount);
+    }
+
     ui.frame_time = sim.simulate();
     sim.draw(r);
     ui.draw(r);

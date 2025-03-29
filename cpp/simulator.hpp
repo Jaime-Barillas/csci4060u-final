@@ -11,7 +11,7 @@
 constexpr float PARTICLE_SIZE = 8;
 constexpr float BOUND_DAMPENING = -0.8f;
 constexpr float SUPPORT_RADIUS = 96.0f;
-constexpr float REST_DENSITY = 4.0f;
+constexpr float REST_DENSITY = 10.0f;
 
 class Simulator {
   float bound_x;
@@ -36,6 +36,7 @@ public:
     float gravity_y
   );
 
+  int32_t get_pcount() const;
   void set_time_step(float value);
   void set_sim_steps(int32_t value);
   void set_gravity_y(float value);

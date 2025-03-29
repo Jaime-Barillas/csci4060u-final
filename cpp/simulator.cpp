@@ -20,6 +20,7 @@ Simulator::Simulator(
   reset_particles(pcount);
 }
 
+int32_t Simulator::get_pcount() const { return pcount; }
 void Simulator::set_time_step(float value) { time_step = value; }
 void Simulator::set_sim_steps(int32_t value) { sim_steps = value; }
 void Simulator::set_gravity_y(float value) { gravity_y = value; }
@@ -78,12 +79,12 @@ void Simulator::integrate(float dt) {
       if (distance < 1.0f) {
         contribution = 1.0f - distance;
         ps[i].density += contribution * contribution;
-        ps[i].near_density += ps[i].density * contribution;
+        ps[i].near_density += contribution * contribution * contribution;
       }
     }
 
-    ps[i].pressure = 0.004 * (ps[i].density - REST_DENSITY);
-    ps[i].near_pressure = 0.01 * ps[i].near_density;
+    ps[i].pressure = 0.4 * (ps[i].density - REST_DENSITY);
+    ps[i].near_pressure = 1.0 * ps[i].near_density;
 
     for (size_t j = 0; j < ps.size(); j++) {
       if (i == j) { continue; }
@@ -105,7 +106,7 @@ void Simulator::integrate(float dt) {
     // 7. Collisions.
 
     // 8. Compute next velocity
-    p.vel = p.pos - p.prev_pos;
+    p.vel = (p.pos - p.prev_pos) / dt;
 
     // 9. Boundary checks.
     if (p.pos.x < 0.0f || p.pos.x > bound_x) {

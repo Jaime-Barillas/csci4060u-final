@@ -7,6 +7,8 @@ struct Vec {
 
   Vec operator-(const Vec &rhs);
   Vec operator*(float scalar) const;
+  Vec operator/(float scalar) const;
+  void operator=(const Vec &rhs);
   void operator+=(const Vec &rhs);
   void operator-=(const Vec &rhs);
   void operator/=(float scalar);

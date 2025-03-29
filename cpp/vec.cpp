@@ -4,7 +4,12 @@
 
 Vec Vec::operator-(const Vec &rhs) { return {x - rhs.x, y - rhs.y}; }
 Vec Vec::operator*(float scalar) const { return {x * scalar, y * scalar}; }
+Vec Vec::operator/(float scalar) const { return {x / scalar, y / scalar}; }
 
+void Vec::operator=(const Vec &rhs) {
+  x = rhs.x;
+  y = rhs.y;
+}
 void Vec::operator+=(const Vec &rhs) {
   x += rhs.x;
   y += rhs.y;
