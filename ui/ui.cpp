@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <string.h>
 
 #include <SDL3/SDL_render.h>
@@ -78,6 +79,12 @@ void Ui::enqueue_draw_cmds() {
     mu_slider_ex(ctx, &sim_steps, SIMSTEPS_MIN, SIMSTEPS_MAX, SIMSTEPS_STEP, "%.0f", MU_OPT_ALIGNCENTER);
     mu_label(ctx, "Gravity Y:");
     mu_slider_ex(ctx, &gravity_y, GRAVITY_Y_MIN, GRAVITY_Y_MAX, GRAVITY_Y_STEP, "%.1f", MU_OPT_ALIGNCENTER);
+
+    int statistics_row[]{155, 210};
+    mu_layout_row(ctx, 2, statistics_row, 0);
+    snprintf(fmtbuf, sizeof(fmtbuf), "%.0f(%.2f)", 1.0f / frame_time, frame_time);
+    mu_label(ctx, "FPS:");
+    mu_label(ctx, fmtbuf);
 
     mu_end_window(ctx);
   }

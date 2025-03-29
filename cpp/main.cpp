@@ -77,7 +77,7 @@ int main(int, char**) {
     SDL_SetRenderDrawColor(r, 48, 34, 24, 255);
     SDL_RenderClear(r);
 
-    sim.simulate();
+    ui.frame_time = sim.simulate();
     sim.draw(r);
     ui.draw(r);
 

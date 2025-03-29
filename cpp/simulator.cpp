@@ -1,4 +1,5 @@
 #include <SDL3/SDL_stdinc.h>
+#include <SDL3/SDL_timer.h>
 
 #include "simulator.hpp"
 
@@ -59,10 +60,17 @@ void Simulator::integrate(float dt) {
   }
 }
 
-void Simulator::simulate() {
+float Simulator::simulate() {
+  uint64_t frame_start;
+  uint64_t frame_total = 0;
+
   for (int32_t step = 0; step < sim_steps; step++) {
+    frame_start = SDL_GetPerformanceCounter();
     integrate(1.0f / time_step);
+    frame_total += SDL_GetPerformanceCounter() - frame_start;
   }
+
+  return (float)frame_total / sim_steps / SDL_GetPerformanceFrequency();
 }
 
 void Simulator::draw(SDL_Renderer *r) {

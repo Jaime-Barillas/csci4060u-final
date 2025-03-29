@@ -26,6 +26,7 @@ struct Ui {
   mu_Real time_step;  // Amount to advance per sim step (in fps)
   mu_Real sim_steps;  // Sim steps per frame
   mu_Real gravity_y;
+  mu_Real frame_time;
   bool draw_ui;          // Toggle drawing of UI.
 
   Ui();
@@ -37,6 +38,8 @@ struct Ui {
   void draw(SDL_Renderer *r);
 
 private:
+  char fmtbuf[16];
+
   void enqueue_draw_cmds();
   void execute_draw_cmds(SDL_Renderer *r);
 };
