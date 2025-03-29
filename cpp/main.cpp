@@ -13,6 +13,7 @@
 #include <SDL3/SDL_video.h>
 
 #include "ui.hpp"
+#include "simulator.hpp"
 
 constexpr int HEIGHT{720};
 constexpr int WIDTH{(HEIGHT * 16) / 10};
@@ -45,6 +46,9 @@ int main(int, char**) {
   SDL_Event ev;
   bool should_quit = false;
 
+  // NOTE: In SDL3, +y goes down so ui.gravity_y needs to be negated to match.
+  Simulator sim(WIDTH, HEIGHT, ui.pcount, ui.time_step, ui.sim_steps, -ui.gravity_y);
+
   SDL_zero(ev);
   while (!should_quit) {
     while (SDL_PollEvent(&ev)) {
@@ -73,7 +77,8 @@ int main(int, char**) {
     SDL_SetRenderDrawColor(r, 48, 34, 24, 255);
     SDL_RenderClear(r);
 
-    // TODO: Draw Particles.
+    sim.simulate();
+    sim.draw(r);
     ui.draw(r);
 
     SDL_RenderPresent(r);

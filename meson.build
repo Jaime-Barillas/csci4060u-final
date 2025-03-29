@@ -43,6 +43,8 @@ libui = library('ui',
 cpp_exe = 'final-cpp'
 cpp_sources = files(
   'cpp/main.cpp',
+  'cpp/vec.cpp',
+  'cpp/simulator.cpp',
 )
 # Provide sdl3 and microui as dependencies despite libui containing them.
 # This ensures the necessary deps are linked against for SDL3 (using

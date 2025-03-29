@@ -19,7 +19,7 @@ Ui::Ui() : ctx{new mu_Context},
            pcount{400},
            time_step{TIMESTEP_STEP * 6},
            sim_steps{1},
-           gravity_y{9.81},
+           gravity_y{-9.81},
            draw_ui{true} {
   mu_init(ctx);
   ctx->text_width = text_width;
