@@ -6,7 +6,8 @@
 struct Particle {
   Vec pos;
   Vec vel;
-  Vec force;
+  Vec accel;
+  Vec force_next;
   float density;
   float near_density;
   float pressure;

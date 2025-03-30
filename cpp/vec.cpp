@@ -2,6 +2,7 @@
 
 #include "vec.hpp"
 
+Vec Vec::operator+(const Vec &rhs) { return {x + rhs.x, y + rhs.y}; }
 Vec Vec::operator-(const Vec &rhs) { return {x - rhs.x, y - rhs.y}; }
 Vec Vec::operator*(float scalar) const { return {x * scalar, y * scalar}; }
 Vec Vec::operator/(float scalar) const { return {x / scalar, y / scalar}; }

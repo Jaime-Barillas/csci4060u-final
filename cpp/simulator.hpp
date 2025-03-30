@@ -54,6 +54,7 @@ public:
   void set_sim_steps(int32_t value);
   void set_gravity_y(float value);
   void reset_particles(int32_t particle_count);
+  void initialize_integration();
   float simulate();
   void draw(SDL_Renderer *r);
 };
