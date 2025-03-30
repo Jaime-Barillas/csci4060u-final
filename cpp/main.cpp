@@ -43,6 +43,7 @@ int main(int, char**) {
   // Support opacity.
   SDL_SetRenderDrawBlendMode(r, SDL_BLENDMODE_BLEND);
   SDL_SetRenderLogicalPresentation(r, WIDTH, HEIGHT, SDL_LOGICAL_PRESENTATION_INTEGER_SCALE);
+  SDL_SetRenderVSync(r, 1);
 
   // Main Loop
   Ui ui{};
