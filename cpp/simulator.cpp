@@ -1,3 +1,4 @@
+#include <omp.h>
 #include <SDL3/SDL_stdinc.h>
 #include <SDL3/SDL_timer.h>
 
@@ -56,6 +57,7 @@ void Simulator::calculate_forces() {
   Vec distance;
 
   // Density and pressure.
+  #pragma omp parallel for private(length, contribution, distance)
   for (size_t i = 0; i < ps.size(); i++) {
     ps[i].density = 0.0f;
     ps[i].near_density = 0.0f;
@@ -82,6 +84,7 @@ void Simulator::calculate_forces() {
   // 3. Calculate forces.
   Vec pressure_force;
   Vec viscosity_force;
+  #pragma omp parallel for private(length, contribution, distance, pressure_force, viscosity_force)
   for (size_t i = 0; i < ps.size(); i++) {
     ps[i].force = {0.0f, 0.0f};
     pressure_force = {0.0f, 0.0f};
@@ -99,7 +102,7 @@ void Simulator::calculate_forces() {
         viscosity_force += ((ps[j].vel - ps[i].vel) / ps[j].density) * VISCOSITY * PARTICLE_MASS * VISC_LAPLACIAN * contribution;
 
         // b) Pressure forces (Gradient of smoothing kernel).
-        //    (support_radius - dist)^3 -> -3(support_radius - dist)^2
+        //    (support_radius - dist)^3
         contribution = SDL_powf(contribution, 3.0f);
         pressure_force -= distance.normalized() *0.05f* PARTICLE_MASS * (ps[i].pressure + ps[j].pressure) / (2.0f * ps[j].density) * SPIKY_GRADIENT * contribution;
         pressure_force -= distance.normalized() * PARTICLE_MASS * (ps[i].near_pressure + ps[j].near_pressure) / (2.0f * ps[j].density) * SPIKY_GRADIENT * contribution;
@@ -114,6 +117,7 @@ void Simulator::calculate_forces() {
 }
 
 void Simulator::integrate(float dt) {
+  #pragma omp parallel for
   for (auto &p : ps) {
     // 4. Integrate.
     p.vel += (p.force / p.density) * dt;

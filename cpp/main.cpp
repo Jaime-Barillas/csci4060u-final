@@ -1,6 +1,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+#include <omp.h>
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_error.h>
 #include <SDL3/SDL_events.h>
@@ -22,6 +23,8 @@ SDL_Window *w{nullptr};
 SDL_Renderer *r{nullptr};
 
 int main(int, char**) {
+  omp_set_num_threads(omp_get_num_procs());
+
   if (!SDL_Init(SDL_INIT_VIDEO)) {
     SDL_Log("Failed to initialize SDL: %s\n", SDL_GetError());
     exit(1);

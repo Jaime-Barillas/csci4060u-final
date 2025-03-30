@@ -53,6 +53,8 @@ executable(cpp_exe,
   cpp_sources,
   include_directories: [libui_incdirs],
   link_with: [libui],
+  cpp_args: ['-fopenmp'],
+  link_args: ['-fopenmp'],
   dependencies: [sdl3, microui]
 )
 
