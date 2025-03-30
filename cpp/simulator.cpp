@@ -41,74 +41,85 @@ void Simulator::reset_particles(int32_t particle_count) {
     float y = (bound_y / 2.0f) + (i / cols) * pos_step - (rows / 2) * pos_step;
     ps[i].pos = {x, y};
     ps[i].vel = {0.0f, 0.0f};
+    ps[i].force = {0.0f, 0.0f};
+    ps[i].density = 0.0f;
+    ps[i].near_density = 0.0f;
+    ps[i].pressure = 0.0f;
+    ps[i].near_pressure = 0.0f;
+  }
+}
+
+void Simulator::calculate_forces() {
+  // A(pi) = Sum( m * A(pj)/pj_density * W(dist, support_radius) )
+  float length;
+  float contribution;
+  Vec distance;
+
+  // Density and pressure.
+  for (size_t i = 0; i < ps.size(); i++) {
+    ps[i].density = 0.0f;
+    ps[i].near_density = 0.0f;
+    ps[i].pressure = 0.0f;
+    ps[i].near_pressure = 0.0f;
+
+    for (size_t j = 0; j < ps.size(); j++) {
+      // 1. Calculate density including self (Smoothing kernel).
+      //    (support_radius^2 - dist^2)^3
+      distance = ps[j].pos - ps[i].pos;
+      length = distance.length_squared();
+      if (length < SUPPORT_RADIUS_SQR) {
+        contribution = SUPPORT_RADIUS_SQR - length;
+        ps[i].density += PARTICLE_MASS * POLY6 * contribution * contribution * contribution;
+        ps[i].near_density += PARTICLE_MASS * (5/SDL_PI_F/(SUPPORT_RADIUS_POW8 * SUPPORT_RADIUS_SQR)) * SDL_powf(contribution, 4.0f);
+      }
+    }
+
+    // 2. Calculate pressure.
+    ps[i].pressure = GAS_CONSTANT * (ps[i].density - REST_DENSITY);
+    ps[i].near_pressure = NEAR_GAS_CONSTANT * ps[i].near_density;
+  }
+
+  // 3. Calculate forces.
+  Vec pressure_force;
+  Vec viscosity_force;
+  for (size_t i = 0; i < ps.size(); i++) {
+    ps[i].force = {0.0f, 0.0f};
+    pressure_force = {0.0f, 0.0f};
+    viscosity_force = {0.0f, 0.0f};
+
+    for (size_t j = 0; j < ps.size(); j++) {
+      if (i == j) { continue; }
+
+      distance = ps[j].pos - ps[i].pos;
+      length = distance.length();
+      if (length < SUPPORT_RADIUS) {
+        contribution = SUPPORT_RADIUS - length;
+
+        // a) Viscosity (Laplacian of smoothing kernel).
+        viscosity_force += ((ps[j].vel - ps[i].vel) / ps[j].density) * VISCOSITY * PARTICLE_MASS * VISC_LAPLACIAN * contribution;
+
+        // b) Pressure forces (Gradient of smoothing kernel).
+        //    (support_radius - dist)^3 -> -3(support_radius - dist)^2
+        contribution = SDL_powf(contribution, 3.0f);
+        pressure_force -= distance.normalized() *0.05f* PARTICLE_MASS * (ps[i].pressure + ps[j].pressure) / (2.0f * ps[j].density) * SPIKY_GRADIENT * contribution;
+        pressure_force -= distance.normalized() * PARTICLE_MASS * (ps[i].near_pressure + ps[j].near_pressure) / (2.0f * ps[j].density) * SPIKY_GRADIENT * contribution;
+      }
+    }
+
+    ps[i].force += pressure_force;
+    ps[i].force += viscosity_force;
+    // c) External forces (Gravity).
+    ps[i].force.y += 0.1f* gravity_y * PARTICLE_MASS / ps[i].density;
   }
 }
 
 void Simulator::integrate(float dt) {
-  // 1. Apply gravity.
   for (auto &p : ps) {
-    p.vel.y += gravity_y * dt;
-  }
-
-  // 2. Apply viscosity.
-
-  // 3. Advance position.
-  for (auto &p : ps) {
-    p.prev_pos = p.pos;
+    // 4. Integrate.
+    p.vel += (p.force / p.density) * dt;
     p.pos += p.vel * dt;
-  }
-  // 4. Adjust viscosity springs.
 
-  // 5. Apply spring displacements.
-
-  // 6. Double Density Relaxation.
-  float distance;
-  float contribution;
-  Vec distance_vec;
-  Vec accumulated_displacement;
-  Vec displacement_vec;
-  for (size_t i = 0; i < ps.size(); i++) {
-    ps[i].density = 0.0f;
-    ps[i].near_density = 0.0f;
-    accumulated_displacement = {0, 0};
-
-    for (size_t j = 0; j < ps.size(); j++) {
-      if (i == j) { continue; }
-      distance_vec = ps[i].pos - ps[j].pos;
-      distance = distance_vec.length() / SUPPORT_RADIUS;
-      if (distance < 1.0f) {
-        contribution = 1.0f - distance;
-        ps[i].density += contribution * contribution;
-        ps[i].near_density += contribution * contribution * contribution;
-      }
-    }
-
-    ps[i].pressure = 0.4 * (ps[i].density - REST_DENSITY);
-    ps[i].near_pressure = 1.0 * ps[i].near_density;
-
-    for (size_t j = 0; j < ps.size(); j++) {
-      if (i == j) { continue; }
-      distance_vec = ps[j].pos - ps[i].pos;
-      distance = distance_vec.length() / SUPPORT_RADIUS;
-      if (distance < 1.0f) {
-        contribution = 1.0f - distance;
-        displacement_vec = distance_vec.normalized() * (dt * dt) * ((ps[i].pressure * contribution) + (ps[i].near_pressure * contribution * contribution));
-        displacement_vec /= 2.0f;
-        ps[j].pos += displacement_vec;
-        accumulated_displacement -= displacement_vec;
-      }
-    }
-
-    ps[i].pos += accumulated_displacement;
-  }
-
-  for (auto &p : ps) {
-    // 7. Collisions.
-
-    // 8. Compute next velocity
-    p.vel = (p.pos - p.prev_pos) / dt;
-
-    // 9. Boundary checks.
+    // 5. Boundary checks.
     if (p.pos.x < 0.0f || p.pos.x > bound_x) {
       p.pos.x = SDL_clamp(p.pos.x, 0.0f, bound_x);
       p.vel.x *= BOUND_DAMPENING;
@@ -126,7 +137,8 @@ float Simulator::simulate() {
 
   for (int32_t step = 0; step < sim_steps; step++) {
     frame_start = SDL_GetPerformanceCounter();
-    integrate(1.0f / time_step);
+    calculate_forces();
+    integrate(0.1f / time_step);
     frame_total += SDL_GetPerformanceCounter() - frame_start;
   }
 

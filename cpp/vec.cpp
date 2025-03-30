@@ -23,8 +23,10 @@ void Vec::operator/=(float scalar) {
   y /= scalar;
 }
 
-float Vec::length() const { return SDL_sqrtf((x * x) + (y * y)); }
+float Vec::length_squared() const { return (x * x) + (y * y); }
+float Vec::length() const { return SDL_sqrtf(length_squared()); }
 Vec Vec::normalized() const {
   float len = length();
   return {x / len, y / len};
 }
+

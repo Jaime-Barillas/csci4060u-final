@@ -14,6 +14,7 @@ struct Vec {
   void operator/=(float scalar);
 
   float length() const;
+  float length_squared() const;
   Vec normalized() const;
 };
 

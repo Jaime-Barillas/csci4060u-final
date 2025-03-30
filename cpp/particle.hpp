@@ -4,9 +4,9 @@
 #include "vec.hpp"
 
 struct Particle {
-  Vec prev_pos;
   Vec pos;
   Vec vel;
+  Vec force;
   float density;
   float near_density;
   float pressure;

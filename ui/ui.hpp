@@ -16,9 +16,9 @@ constexpr mu_Real TIMESTEP_STEP{10};      // Unit: fps, Increments of 10fps
 constexpr mu_Real SIMSTEPS_MAX{5};
 constexpr mu_Real SIMSTEPS_MIN{1};
 constexpr mu_Real SIMSTEPS_STEP{1};
-constexpr mu_Real GRAVITY_Y_MAX{2000.0f};
-constexpr mu_Real GRAVITY_Y_MIN{-2000.0f};
-constexpr mu_Real GRAVITY_Y_STEP{10.0f};
+constexpr mu_Real GRAVITY_Y_MAX{20.0f};
+constexpr mu_Real GRAVITY_Y_MIN{-20.0f};
+constexpr mu_Real GRAVITY_Y_STEP{0.1f};
 
 struct Ui {
   mu_Context *ctx;

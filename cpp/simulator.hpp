@@ -5,13 +5,26 @@
 #include <vector>
 
 #include <SDL3/SDL_render.h>
+#include <SDL3/SDL_stdinc.h>
 
 #include "particle.hpp"
 
 constexpr float PARTICLE_SIZE = 8;
-constexpr float BOUND_DAMPENING = -0.8f;
-constexpr float SUPPORT_RADIUS = 96.0f;
-constexpr float REST_DENSITY = 10.0f;
+constexpr float PARTICLE_MASS = 2.5f;
+constexpr float BOUND_DAMPENING = -0.5f;
+constexpr float SUPPORT_RADIUS = 16.0f;
+constexpr float GAS_CONSTANT = 2000.0f;
+constexpr float NEAR_GAS_CONSTANT = 30000.0f;
+constexpr float REST_DENSITY = 300.0f;
+constexpr float VISCOSITY = 200.0f;
+
+// Precompute coefficients of kernel functions.
+constexpr float SUPPORT_RADIUS_SQR = SUPPORT_RADIUS * SUPPORT_RADIUS;
+constexpr float SUPPORT_RADIUS_POW5 = SUPPORT_RADIUS_SQR * SUPPORT_RADIUS_SQR * SUPPORT_RADIUS;
+constexpr float SUPPORT_RADIUS_POW8 = SUPPORT_RADIUS_POW5 * SUPPORT_RADIUS_SQR * SUPPORT_RADIUS;
+constexpr float POLY6 = 4.0f / (SDL_PI_F * SUPPORT_RADIUS_POW8);
+constexpr float SPIKY_GRADIENT = -10.0f / (SDL_PI_F * SUPPORT_RADIUS_POW5);
+constexpr float VISC_LAPLACIAN = 40.0f / (SDL_PI_F * SUPPORT_RADIUS_POW5);
 
 class Simulator {
   float bound_x;
@@ -20,10 +33,10 @@ class Simulator {
   float time_step;
   int32_t sim_steps;
   float gravity_y;
-  float frame_times[4];
 
   std::vector<Particle> ps;
 
+  void calculate_forces();
   void integrate(float dt);
 
 public:
