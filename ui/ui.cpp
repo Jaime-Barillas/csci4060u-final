@@ -21,6 +21,8 @@ Ui::Ui() : ctx{new mu_Context},
            time_step{TIMESTEP_STEP * 12},
            sim_steps{1},
            gravity_y{-9.80},
+           frame_time_sim{0.0f},
+           frame_time_step{0.0f},
            draw_ui{true} {
   mu_init(ctx);
   ctx->text_width = text_width;
@@ -82,8 +84,11 @@ void Ui::enqueue_draw_cmds() {
 
     int statistics_row[]{155, 210};
     mu_layout_row(ctx, 2, statistics_row, 0);
-    snprintf(fmtbuf, sizeof(fmtbuf), "%.0f(%.4f)", 1.0f / frame_time, frame_time);
-    mu_label(ctx, "FPS:");
+    snprintf(fmtbuf, sizeof(fmtbuf), "%.0f(%.2fms)", 1.0f / frame_time_sim, frame_time_sim * 1000.0f);
+    mu_label(ctx, "FPS(Simulate):");
+    mu_label(ctx, fmtbuf);
+    snprintf(fmtbuf, sizeof(fmtbuf), "%.0f(%.2fms)", 1.0f / frame_time_step, frame_time_step * 1000.0f);
+    mu_label(ctx, "Frametime(Step):");
     mu_label(ctx, fmtbuf);
 
     mu_end_window(ctx);

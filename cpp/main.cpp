@@ -11,6 +11,7 @@
 #include <SDL3/SDL_rect.h>
 #include <SDL3/SDL_render.h>
 #include <SDL3/SDL_stdinc.h>
+#include <SDL3/SDL_timer.h>
 #include <SDL3/SDL_video.h>
 
 #include "ui.hpp"
@@ -49,6 +50,7 @@ int main(int, char**) {
   Ui ui{};
   SDL_Event ev;
   bool should_quit = false;
+  uint64_t sim_time;
 
   // NOTE: In SDL3, +y goes down so ui.gravity_y needs to be negated to match.
   Simulator sim(WIDTH, HEIGHT, ui.pcount, ui.time_step, ui.sim_steps, -ui.gravity_y);
@@ -88,7 +90,11 @@ int main(int, char**) {
       sim.reset_particles(ui.pcount);
     }
 
-    ui.frame_time = sim.simulate();
+    sim_time = SDL_GetPerformanceCounter();
+    ui.frame_time_step = sim.simulate();
+    sim_time = SDL_GetPerformanceCounter() - sim_time;
+    ui.frame_time_sim = (float)sim_time / SDL_GetPerformanceFrequency();
+
     sim.draw(r);
     ui.draw(r);
 
