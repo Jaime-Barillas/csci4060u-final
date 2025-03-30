@@ -19,6 +19,7 @@
 
 constexpr int HEIGHT{720};
 constexpr int WIDTH{(HEIGHT * 16) / 10};
+constexpr int AVG_FPS_BUF_SIZE = 15;
 
 SDL_Window *w{nullptr};
 SDL_Renderer *r{nullptr};
@@ -51,6 +52,12 @@ int main(int, char**) {
   SDL_Event ev;
   bool should_quit = false;
   uint64_t sim_time;
+  float sim_times[AVG_FPS_BUF_SIZE];
+  float step_times[AVG_FPS_BUF_SIZE];
+  uint32_t sim_time_idx = 0;
+  uint32_t step_time_idx = 0;
+  float sim_time_total;
+  float step_time_total;
 
   // NOTE: In SDL3, +y goes down so ui.gravity_y needs to be negated to match.
   Simulator sim(WIDTH, HEIGHT, ui.pcount, ui.time_step, ui.sim_steps, -ui.gravity_y);
@@ -90,11 +97,25 @@ int main(int, char**) {
       sim.reset_particles(ui.pcount);
     }
 
+    // Perform simulation and track timings.
     sim_time = SDL_GetPerformanceCounter();
-    ui.frame_time_step = sim.simulate();
+    step_times[step_time_idx] = sim.simulate();
     sim_time = SDL_GetPerformanceCounter() - sim_time;
-    ui.frame_time_sim = (float)sim_time / SDL_GetPerformanceFrequency();
+    sim_times[sim_time_idx] = (float)sim_time / SDL_GetPerformanceFrequency();
 
+    // Calculate average framerate over AVG_FPS_BUF_SIZE frames.
+    step_time_idx = (step_time_idx + 1) % AVG_FPS_BUF_SIZE;
+    sim_time_idx = (sim_time_idx + 1) % AVG_FPS_BUF_SIZE;
+    sim_time_total = 0.0f;
+    step_time_total = 0.0f;
+    for (int32_t i = 0; i < AVG_FPS_BUF_SIZE; i++) {
+      step_time_total += step_times[i];
+      sim_time_total += sim_times[i];
+    }
+    ui.frame_time_step = step_time_total / AVG_FPS_BUF_SIZE;
+    ui.frame_time_sim = sim_time_total / AVG_FPS_BUF_SIZE;
+
+    // Draw particles and UI.
     sim.draw(r);
     ui.draw(r);
 
