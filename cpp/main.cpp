@@ -1,7 +1,9 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+#ifdef ENABLE_PARALLELISM
 #include <omp.h>
+#endif
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_error.h>
 #include <SDL3/SDL_events.h>
@@ -25,7 +27,9 @@ SDL_Window *w{nullptr};
 SDL_Renderer *r{nullptr};
 
 int main(int, char**) {
+#ifdef ENABLE_PARALLELISM
   omp_set_num_threads(omp_get_num_procs());
+#endif
 
   if (!SDL_Init(SDL_INIT_VIDEO)) {
     SDL_Log("Failed to initialize SDL: %s\n", SDL_GetError());

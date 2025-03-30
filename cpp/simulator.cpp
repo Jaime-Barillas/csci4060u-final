@@ -1,4 +1,6 @@
+#ifdef ENABLE_PARALLELISM
 #include <omp.h>
+#endif
 #include <SDL3/SDL_stdinc.h>
 #include <SDL3/SDL_timer.h>
 
@@ -57,7 +59,9 @@ void Simulator::calculate_forces() {
   Vec distance;
 
   // Density and pressure.
+#ifdef ENABLE_PARALLELISM
   #pragma omp parallel for private(length, contribution, distance)
+#endif
   for (int32_t i = 0; i < ps.size(); i++) {
     ps[i].density = 0.0f;
     ps[i].near_density = 0.0f;
@@ -84,7 +88,9 @@ void Simulator::calculate_forces() {
   // 3. Calculate forces.
   Vec pressure_force;
   Vec viscosity_force;
+#ifdef ENABLE_PARALLELISM
   #pragma omp parallel for private(length, contribution, distance, pressure_force, viscosity_force)
+#endif
   for (int32_t i = 0; i < ps.size(); i++) {
     ps[i].force = {0.0f, 0.0f};
     pressure_force = {0.0f, 0.0f};
@@ -117,7 +123,9 @@ void Simulator::calculate_forces() {
 }
 
 void Simulator::integrate(float dt) {
+#ifdef ENABLE_PARALLELISM
   #pragma omp parallel for
+#endif
   for (int32_t i = 0; i < ps.size(); i++) {
     // 4. Integrate.
     ps[i].vel += (ps[i].force / ps[i].density) * dt;

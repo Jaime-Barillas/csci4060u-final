@@ -40,13 +40,14 @@ libui = library('ui',
 # ##############
 # CPP Program
 # ##############
-cpp_exe = 'final-cpp'
+cpp_exe_sequential = 'final-cpp-sequential'
+cpp_exe_parallel = 'final-cpp'
 cpp_sources = files(
   'cpp/main.cpp',
   'cpp/vec.cpp',
   'cpp/simulator.cpp',
 )
-cpp_args = ['-fopenmp']
+cpp_args = ['-DENABLE_PARALLELISM', '-fopenmp']
 cpp_link_args = ['-fopenmp']
 if host_machine.system() == 'windows'
   cpp_args = ['-openmp']
@@ -55,7 +56,14 @@ endif
 # Provide sdl3 and microui as dependencies despite libui containing them.
 # This ensures the necessary deps are linked against for SDL3 (using
 # partial_dependency() does not seem to include them).
-executable(cpp_exe,
+executable(cpp_exe_sequential,
+  cpp_sources,
+  include_directories: [libui_incdirs],
+  link_with: [libui],
+  dependencies: [sdl3, microui]
+)
+
+executable(cpp_exe_parallel,
   cpp_sources,
   include_directories: [libui_incdirs],
   link_with: [libui],
