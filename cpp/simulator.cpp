@@ -44,7 +44,8 @@ void Simulator::reset_particles(int32_t particle_count) {
     float y = (bound_y / 2.0f) + (i / cols) * pos_step - (rows / 2) * pos_step;
     ps[i].pos = {x, y};
     ps[i].vel = {0.0f, 0.0f};
-    ps[i].force_next = {0.0f, 0.0f};
+    ps[i].vel_full_step = {0.0f, 0.0f};
+    ps[i].force = {0.0f, 0.0f};
     ps[i].density = 0.0f;
     ps[i].near_density = 0.0f;
     ps[i].pressure = 0.0f;
@@ -92,7 +93,7 @@ void Simulator::calculate_forces() {
   #pragma omp parallel for private(length, contribution, distance, pressure_force, viscosity_force)
 #endif
   for (int32_t i = 0; i < ps.size(); i++) {
-    ps[i].force_next = {0.0f, 0.0f};
+    ps[i].force = {0.0f, 0.0f};
     pressure_force = {0.0f, 0.0f};
     viscosity_force = {0.0f, 0.0f};
 
@@ -105,7 +106,7 @@ void Simulator::calculate_forces() {
         contribution = SUPPORT_RADIUS - length;
 
         // a) Viscosity (Laplacian of smoothing kernel).
-        viscosity_force += ((ps[j].vel - ps[i].vel) / ps[j].density) * VISCOSITY * PARTICLE_MASS * VISC_LAPLACIAN * contribution;
+        viscosity_force += ((ps[j].vel_full_step - ps[i].vel_full_step) / ps[j].density) * VISCOSITY * PARTICLE_MASS * VISC_LAPLACIAN * contribution;
 
         // b) Pressure forces (Gradient of smoothing kernel).
         //    (support_radius - dist)^3
@@ -115,35 +116,39 @@ void Simulator::calculate_forces() {
       }
     }
 
-    ps[i].force_next += pressure_force;
-    ps[i].force_next += viscosity_force;
+    ps[i].force += pressure_force;
+    ps[i].force += viscosity_force;
     // c) External forces (Gravity).
-    ps[i].force_next.y += 0.1f* gravity_y * PARTICLE_MASS / ps[i].density;
+    ps[i].force.y += 0.1f* gravity_y * PARTICLE_MASS / ps[i].density;
   }
 }
 
 // Initialize values for leapfrog method.
 void Simulator::initialize_integration() {
+  float dt = 1.0f / time_step;
   calculate_forces();
 
 #ifdef ENABLE_PARALLELISM
   #pragma omp parallel for
 #endif
   for (int32_t i = 0; i < ps.size(); i++) {
-    ps[i].accel = ps[i].force_next / ps[i].density;
+    ps[i].vel = ps[i].force / ps[i].density * 0.5f * dt;
   }
 }
 
 void Simulator::integrate(float dt) {
+  Vec accel = {0.0f, 0.0f};
+
 #ifdef ENABLE_PARALLELISM
-  #pragma omp parallel for
+  #pragma omp parallel for private(accel)
 #endif
   for (int32_t i = 0; i < ps.size(); i++) {
     // 4. Integrate.
-    // Leapfrog method (synchronized form).
-    ps[i].vel += (ps[i].accel + (ps[i].force_next / ps[i].density)) * 0.5f * dt;
-    ps[i].pos += (ps[i].vel * dt) + (ps[i].accel * 0.5f * dt * dt);
-    ps[i].accel = ps[i].force_next / ps[i].density;
+    // Leapfrog method.
+    accel = (ps[i].force / ps[i].density) * dt;
+    ps[i].pos += ps[i].vel * dt;
+    ps[i].vel += accel;
+    ps[i].vel_full_step = ps[i].vel + (accel * 0.5f);
 
     // 5. Boundary checks.
     if (ps[i].pos.x < 0.0f || ps[i].pos.x > bound_x) {
