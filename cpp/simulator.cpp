@@ -58,13 +58,13 @@ void Simulator::calculate_forces() {
 
   // Density and pressure.
   #pragma omp parallel for private(length, contribution, distance)
-  for (size_t i = 0; i < ps.size(); i++) {
+  for (int32_t i = 0; i < ps.size(); i++) {
     ps[i].density = 0.0f;
     ps[i].near_density = 0.0f;
     ps[i].pressure = 0.0f;
     ps[i].near_pressure = 0.0f;
 
-    for (size_t j = 0; j < ps.size(); j++) {
+    for (int32_t j = 0; j < ps.size(); j++) {
       // 1. Calculate density including self (Smoothing kernel).
       //    (support_radius^2 - dist^2)^3
       distance = ps[j].pos - ps[i].pos;
@@ -85,12 +85,12 @@ void Simulator::calculate_forces() {
   Vec pressure_force;
   Vec viscosity_force;
   #pragma omp parallel for private(length, contribution, distance, pressure_force, viscosity_force)
-  for (size_t i = 0; i < ps.size(); i++) {
+  for (int32_t i = 0; i < ps.size(); i++) {
     ps[i].force = {0.0f, 0.0f};
     pressure_force = {0.0f, 0.0f};
     viscosity_force = {0.0f, 0.0f};
 
-    for (size_t j = 0; j < ps.size(); j++) {
+    for (int32_t j = 0; j < ps.size(); j++) {
       if (i == j) { continue; }
 
       distance = ps[j].pos - ps[i].pos;
@@ -118,19 +118,19 @@ void Simulator::calculate_forces() {
 
 void Simulator::integrate(float dt) {
   #pragma omp parallel for
-  for (auto &p : ps) {
+  for (int32_t i = 0; i < ps.size(); i++) {
     // 4. Integrate.
-    p.vel += (p.force / p.density) * dt;
-    p.pos += p.vel * dt;
+    ps[i].vel += (ps[i].force / ps[i].density) * dt;
+    ps[i].pos += ps[i].vel * dt;
 
     // 5. Boundary checks.
-    if (p.pos.x < 0.0f || p.pos.x > bound_x) {
-      p.pos.x = SDL_clamp(p.pos.x, 0.0f, bound_x);
-      p.vel.x *= BOUND_DAMPENING;
+    if (ps[i].pos.x < 0.0f || ps[i].pos.x > bound_x) {
+      ps[i].pos.x = SDL_clamp(ps[i].pos.x, 0.0f, bound_x);
+      ps[i].vel.x *= BOUND_DAMPENING;
     }
-    if (p.pos.y < 0.0f || p.pos.y > bound_y) {
-      p.pos.y = SDL_clamp(p.pos.y, 0.0f, bound_y);
-      p.vel.y *= BOUND_DAMPENING;
+    if (ps[i].pos.y < 0.0f || ps[i].pos.y > bound_y) {
+      ps[i].pos.y = SDL_clamp(ps[i].pos.y, 0.0f, bound_y);
+      ps[i].vel.y *= BOUND_DAMPENING;
     }
   }
 }

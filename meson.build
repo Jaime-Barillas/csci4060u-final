@@ -46,6 +46,12 @@ cpp_sources = files(
   'cpp/vec.cpp',
   'cpp/simulator.cpp',
 )
+cpp_args = ['-fopenmp']
+cpp_link_args = ['-fopenmp']
+if host_machine.system() == 'windows'
+  cpp_args = ['-openmp']
+  cpp_link_args = []
+endif
 # Provide sdl3 and microui as dependencies despite libui containing them.
 # This ensures the necessary deps are linked against for SDL3 (using
 # partial_dependency() does not seem to include them).
@@ -53,8 +59,8 @@ executable(cpp_exe,
   cpp_sources,
   include_directories: [libui_incdirs],
   link_with: [libui],
-  cpp_args: ['-fopenmp'],
-  link_args: ['-fopenmp'],
+  cpp_args: cpp_args,
+  link_args: cpp_link_args,
   dependencies: [sdl3, microui]
 )
 
