@@ -5,7 +5,6 @@ struct Vec {
   float x;
   float y;
 
-  Vec operator+(const Vec &rhs);
   Vec operator-(const Vec &rhs);
   Vec operator*(float scalar) const;
   Vec operator/(float scalar) const;

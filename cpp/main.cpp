@@ -65,7 +65,6 @@ int main(int, char**) {
 
   // NOTE: In SDL3, +y goes down so ui.gravity_y needs to be negated to match.
   Simulator sim(WIDTH, HEIGHT, ui.pcount, ui.time_step, ui.sim_steps, -ui.gravity_y);
-  sim.initialize_integration();
 
   SDL_zero(ev);
   while (!should_quit) {
@@ -100,7 +99,6 @@ int main(int, char**) {
     sim.set_gravity_y(-ui.gravity_y);
     if (ui.pcount != sim.get_pcount()) {
       sim.reset_particles(ui.pcount);
-      sim.initialize_integration();
     }
 
     // Perform simulation and track timings.
