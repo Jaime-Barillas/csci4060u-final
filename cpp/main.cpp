@@ -19,6 +19,12 @@
 #include "ui.hpp"
 #include "simulator.hpp"
 
+#ifdef USE_VULKAN_RENDERER
+#define RENDERER_NAME "vulkan,software"
+#else
+#define RENDERER_NAME nullptr
+#endif
+
 constexpr int HEIGHT{720};
 constexpr int WIDTH{(HEIGHT * 16) / 10};
 constexpr int AVG_FPS_BUF_SIZE = 15;
@@ -29,6 +35,7 @@ SDL_Renderer *r{nullptr};
 int main(int, char**) {
 #ifdef ENABLE_PARALLELISM
   omp_set_num_threads(omp_get_num_procs());
+  SDL_Log("Parallelism Level: %d", omp_get_num_procs());
 #endif
 
   if (!SDL_Init(SDL_INIT_VIDEO)) {
@@ -41,8 +48,15 @@ int main(int, char**) {
   SDL_GetDisplayUsableBounds(display, &rect);
   int32_t window_height = (int32_t)SDL_floorf(rect.h / HEIGHT) * HEIGHT;
   int32_t window_width = (window_height * 16) / 10;
-  if (!SDL_CreateWindowAndRenderer("CSCI4060U - Fluid2D", window_width, window_height, 0, &w, &r)) {
-    SDL_Log("Failed to create window + renderer: %s\n", SDL_GetError());
+  w = SDL_CreateWindow("CSCI4060U - Fluid2D", window_width, window_height, 0);
+  if (!w) {
+    SDL_Log("Failed to create window: %s\n", SDL_GetError());
+    exit(1);
+  }
+
+  r = SDL_CreateRenderer(w, RENDERER_NAME);
+  if (!r) {
+    SDL_Log("Failed to create renderer: %s\n", SDL_GetError());
     exit(1);
   }
 

@@ -47,11 +47,20 @@ cpp_sources = files(
   'cpp/vec.cpp',
   'cpp/simulator.cpp',
 )
-cpp_args = ['-DENABLE_PARALLELISM', '-fopenmp']
+cpp_args_sequential = []
+cpp_args_parallel = ['-fopenmp', '-DENABLE_PARALLELISM']
 cpp_link_args = ['-fopenmp']
+
+# SDL3 currently has a bug where debug text does not render correctly with the
+# default renderer. On Windows, we must explicitly use the vulkan renderer.
 if host_machine.system() == 'windows'
-  cpp_args = ['-openmp']
-  cpp_link_args = []
+  if meson.get_compiler('cpp').get_id() == 'msvc'
+    # msvc requires -openmp over -fopenmp
+    cpp_args_parallel = ['-openmp', '-DENABLE_PARALLELISM']
+    cpp_link_args = []
+  endif
+  cpp_args_sequential += '-DUSE_VULKAN_RENDERER'
+  cpp_args_parallel += '-DUSE_VULKAN_RENDERER'
 endif
 # Provide sdl3 and microui as dependencies despite libui containing them.
 # This ensures the necessary deps are linked against for SDL3 (using
@@ -60,6 +69,8 @@ executable(cpp_exe_sequential,
   cpp_sources,
   include_directories: [libui_incdirs],
   link_with: [libui],
+  cpp_args: cpp_args_sequential,
+  link_args: cpp_link_args,
   dependencies: [sdl3, microui]
 )
 
@@ -67,7 +78,7 @@ executable(cpp_exe_parallel,
   cpp_sources,
   include_directories: [libui_incdirs],
   link_with: [libui],
-  cpp_args: cpp_args,
+  cpp_args: cpp_args_parallel,
   link_args: cpp_link_args,
   dependencies: [sdl3, microui]
 )
