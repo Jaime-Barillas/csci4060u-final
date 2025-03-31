@@ -18,8 +18,8 @@ static int text_height(mu_Font) {
 
 Ui::Ui() : ctx{new mu_Context},
            pcount{400},
-           time_step{TIMESTEP_STEP * 12},
-           sim_steps{1},
+           time_step{TIMESTEP_STEP * 6},
+           sim_steps{2},
            gravity_y{-9.80},
            frame_time_sim{0.0f},
            frame_time_step{0.0f},
