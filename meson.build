@@ -7,6 +7,8 @@ project('final', 'cpp',
   ]
 )
 
+fs = import('fs')
+
 
 
 # ##############
@@ -88,32 +90,43 @@ executable(cpp_exe_parallel,
 # ##############
 # Pony Program
 # ##############
-# ponyc = find_program('ponyc')
-# pony_exe = 'final-pony'
-# pony_opts = [
-#   #'--path', additional_ponyc_path,
-#   #'--path', libzlib_dir,
-#   '--output', '@OUTDIR@',
-#   '--bin-name', pony_exe
-# ]
-# # Source files aren't fed to ponyc directly, but meson does need them to
-# # determine when to recompile.
-# pony_sources = files(
-#   'pony/main.pony',
-# )
+ponyc = find_program('ponyc', version: '>=0.58.10', required: false)
 
-# if host_machine.system() == 'windows'
-#   pony_exe = pony_exe + '.exe'
-# endif
+if ponyc.found()
+  pony_exe = 'final-pony'
+  pony_opts = []
 
-# final_pony = custom_target(pony_exe,
-#   output: pony_exe,
-#   input: pony_sources,
-#   build_by_default: true,
-#   command: [
-#     ponyc,
-#     pony_opts,
-#     '@SOURCE_ROOT@/pony',
-#   ]
-# )
+  if get_option('debug') == true
+    pony_opts += '--debug'
+  endif
+
+  if host_machine.system() == 'windows'
+    pony_exe += '.exe'
+    pony_opts += '-DUSE_VULKAN_RENDERER'
+  endif
+
+  pony_opts += [
+    '--path', fs.parent(libui.full_path()),
+    '--output', '@OUTDIR@',
+    '--bin-name', pony_exe
+  ]
+
+  # Source files aren't fed to ponyc directly, but meson does need them to
+  # determine when to recompile.
+  pony_sources = files(
+    'pony/main.pony',
+  )
+
+  final_pony = custom_target('final-pony',
+    output: pony_exe,
+    input: pony_sources,
+    build_by_default: true,
+    depends: libui,
+    command: [
+      ponyc,
+      pony_opts,
+      '@SOURCE_ROOT@/pony',
+    ]
+  )
+endif
 
