@@ -115,6 +115,7 @@ if ponyc.found()
   # determine when to recompile.
   pony_sources = files(
     'pony/main.pony',
+    'pony/sdl.pony',
   )
 
   final_pony = custom_target('final-pony',
