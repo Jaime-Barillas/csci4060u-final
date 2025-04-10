@@ -1,9 +1,8 @@
-project('final', 'cpp',
+project('final', 'cpp', 'c',
   version : '0.1',
   default_options : [
     'cpp_std=c++17',
     'warning_level=3',
-    'default_library=static'
   ]
 )
 
@@ -14,27 +13,25 @@ fs = import('fs')
 # ##############
 # Shared Dependencies
 # ##############
-# SDL3, microui, and the libui Pony wrapper library are compiled into a single
-# library dependency to accommodate how Pony links with static libraries. Pony
-# expects the static library to end with the '.lib' extension on windows but
-# meson uses a '.a' extension by default.
-sdl3 = dependency('sdl3')
-microui = dependency('microui')
+sdl3_proj = subproject('sdl3', default_options: ['default_library=shared'])
+sdl3 = sdl3_proj.get_variable('sdl3_dep')
+sdl3_lib = sdl3_proj.get_variable('sdl_lib')
+microui = dependency('microui', default_options: ['default_library=static'])
 
 libui_incdirs = include_directories('ui')
 libui_srcs = files('ui/ui.cpp')
 libui_name_suffix = []
 
 # Use standard '.lib' extension when compiling static libraries on windows.
-if host_machine.system() == 'windows' and get_option('default_library') == 'static'
+if host_machine.system() == 'windows'
   libui_name_suffix = 'lib'
 endif
 
-libui = library('ui',
+libui = static_library('ui',
   libui_srcs,
   include_directories: libui_incdirs,
   name_suffix: libui_name_suffix,
-  dependencies: [sdl3.as_link_whole(), microui.as_link_whole()],
+  dependencies: [sdl3, microui.as_link_whole()],
 )
 
 
@@ -73,6 +70,7 @@ executable(cpp_exe_sequential,
   link_with: [libui],
   cpp_args: cpp_args_sequential,
   link_args: cpp_link_args,
+  build_rpath: '$ORIGIN',
   dependencies: [sdl3, microui]
 )
 
@@ -82,6 +80,7 @@ executable(cpp_exe_parallel,
   link_with: [libui],
   cpp_args: cpp_args_parallel,
   link_args: cpp_link_args,
+  build_rpath: '$ORIGIN',
   dependencies: [sdl3, microui]
 )
 
@@ -107,6 +106,7 @@ if ponyc.found()
 
   pony_opts += [
     '--path', fs.parent(libui.full_path()),
+    '--path', fs.parent(sdl3_lib.full_path()),
     '--output', '@OUTDIR@',
     '--bin-name', pony_exe
   ]

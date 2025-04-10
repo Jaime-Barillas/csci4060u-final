@@ -1,13 +1,5 @@
-use "lib:ui"             if not windows
-use "lib:libui"          if windows
-
-use "lib:udev"           if not windows
-use "lib:dbus-1"         if not windows
-use "lib:pipewire-0.3"   if not windows
-use "lib:wayland-client" if not windows
-use "lib:wayland-egl"    if not windows
-use "lib:wayland-cursor" if not windows
-use "lib:xkbcommon"      if not windows
+use "lib:SDL3"             if not windows
+use "lib:libSDL3"          if windows
 
 use "lib:version"        if windows
 use "lib:Imm32"          if windows
@@ -40,7 +32,7 @@ use @SDL_SetRenderDrawColor[CBool](renderer: SdlRenderer, r: U8, g: U8, b: U8, a
 use @SDL_RenderClear[CBool](renderer: SdlRenderer)
 use @SDL_RenderPresent[CBool](renderer: SdlRenderer)
 
-type CBool is U32
+type CBool is U8
 
 primitive SdlInitVideo
   fun apply(): U32 => 0x20
