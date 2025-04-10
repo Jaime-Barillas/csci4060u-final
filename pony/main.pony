@@ -1,49 +1,114 @@
+use "actor_pinning"
+use "runtime_info"
+
+primitive C
+  fun height(): I32 => 720
+  fun width(): I32 => (C.height() * 16) / 10
+  fun renderer_name(): Pointer[U8] tag =>
+    ifdef "USE_VULKAN_RENDERER" then
+      "vulkan,software".cstring()
+    else
+      Pointer[U8]
+    end
+
 actor Main
-  let _renderer_name: Pointer[U8] tag
+  let _env: Env
+  let _pin_auth: PinUnpinActorAuth
+  let _ev: SdlEvent = SdlEvent
+  var _w: SdlWindow = SdlWindow
+  var _r: SdlRenderer = SdlRenderer
+  var should_quit: Bool = false
 
   new create(env: Env) =>
-    ifdef "USE_VULKAN_RENDERER" then
-      _renderer_name = "vulkan,software".cstring()
+    _env = env
+    _pin_auth = PinUnpinActorAuth(env.root)
+
+    // Print the number of _maximum_ scheduler threads.
+    let num_schedulers = Scheduler.schedulers(SchedulerInfoAuth(_env.root))
+    _env.out.print("Parallelism Level: " + num_schedulers.string())
+
+    ActorPinning.request_pin(_pin_auth)
+    await_pinned_then_init()
+
+  be await_pinned_then_init() =>
+    if not ActorPinning.is_successfully_pinned(_pin_auth) then
+      await_pinned_then_init()
+      return
+    end
+
+    if init_SDL() then
+      // init_ui()
+      // init_sim()
+      iterate()
     else
-      _renderer_name = Pointer[U8]
+      _env.exitcode(1)
+      cleanup()
     end
 
-    if @SDL_Init(SdlInitVideo()) == 0 then
-      env.out.print("Fail")
-      env.exitcode(1)
+  be iterate() =>
+    if should_quit then
+      cleanup()
+      return
     end
 
-    let n = @SDL_GetPrimaryDisplay()
-    env.out.print("Hello, World!" + n.string())
-
-    let w = @SDL_CreateWindow("Final - CSCI4060U - Pony".cstring(), 768, 512, 0)
-    if w.is_null() then
-      env.out.print("Window")
-      env.exitcode(1)
-    end
-    let r = @SDL_CreateRenderer(w, Pointer[U8])
-    if r.is_null() then
-      env.out.print("Renderer")
-      env.exitcode(1)
-    end
-
-    var should_quit = false
-    var ev = SdlEvent
-    while not should_quit do
-      while (@SDL_PollEvent(ev) != 0) do
-        match ev.event_type()
-        | let _: SdlEventQuit => should_quit = true
-          env.out.print("Quitting...")
-        end
+    while @SDL_PollEvent(_ev) != 0 do
+      @SDL_ConvertEventToRenderCoordinates(_r, _ev)
+      match _ev.event_type()
+      | let _: SdlEventQuit => should_quit = true
       end
-
-      @SDL_SetRenderDrawColor(r, 0, 12, 56, 255)
-      @SDL_RenderClear(r)
-      @SDL_RenderPresent(r)
     end
 
-    @SDL_DestroyRenderer(r)
-    @SDL_DestroyWindow(r)
+    @SDL_SetRenderDrawColor(_r, 12, 12, 64, 255)
+    @SDL_RenderClear(_r)
+    @SDL_RenderPresent(_r)
+
+    iterate()
+
+  fun ref init_SDL(): Bool =>
+    if @SDL_Init(SdlInitVideo()) == 0 then
+      let err = String.copy_cstring(@SDL_GetError())
+      _env.out.print("Failed to initialize SDL: " + err)
+      return false
+    end
+
+    let rect = SdlRect
+    let display = @SDL_GetPrimaryDisplay()
+    @SDL_GetDisplayUsableBounds(display, rect)
+    // W/ integer truncation: Get largest multiple of height that fits display.
+    let height = (rect.h / C.height()) * C.height()
+    let width = (height * 16) / 10  // 16 by 10 best aspect ratio
+
+    _w = @SDL_CreateWindow("Final - CSCI4060U - Pony".cstring(), width, height, 0)
+    if _w.is_null() then
+      let err = String.copy_cstring(@SDL_GetError())
+      _env.out.print("Failed to create window: " + err)
+      return false
+    end
+
+    _r = @SDL_CreateRenderer(_w, C.renderer_name())
+    if _r.is_null() then
+      let err = String.copy_cstring(@SDL_GetError())
+      _env.out.print("Failed to create renderer: " + err)
+      return false
+    end
+
+    // Bonus renderer setup. Assume these all succeed...
+    // LogicalPresentation -> Scaling
+    // VSync -> Quiter operation when not under load.
+    @SDL_SetRenderDrawBlendMode(_r, SdlBlendmodeBlend())
+    @SDL_SetRenderLogicalPresentation(_r, C.width(), C.height(), SdlLogicalPresentationIntegerScale())
+    @SDL_SetRenderVSync(_r, 1)
+
+    true
+
+  fun ref cleanup() =>
+    if not _w.is_null() then
+      @SDL_DestroyWindow(_w)
+    end
+
+    if not _r.is_null() then
+      @SDL_DestroyRenderer(_r)
+    end
 
     @SDL_Quit()
 

@@ -24,14 +24,15 @@ use "lib:comdlg32"       if windows
 
 use @SDL_Init[CBool](flags: U32)
 use @SDL_Quit[None]()
+use @SDL_GetError[Pointer[U8] box]()
 use @SDL_GetPrimaryDisplay[SdlDisplayID]()
 use @SDL_GetDisplayUsableBounds[CBool](id: SdlDisplayID, rect: SdlRect tag)
-use @SDL_CreateWindow[SdlWindow](title: Pointer[U8] tag, width: U32, height: U32, flags: U64)
+use @SDL_CreateWindow[SdlWindow](title: Pointer[U8] tag, width: I32, height: I32, flags: U64)
 use @SDL_DestroyWindow[None](window: SdlWindow)
 use @SDL_CreateRenderer[SdlRenderer](window: SdlWindow, renderer_name: Pointer[U8] tag)
 use @SDL_DestroyRenderer[None](renderer: SdlRenderer)
 use @SDL_SetRenderDrawBlendMode[CBool](renderer: SdlRenderer, mode: U32)
-use @SDL_SetRenderLogicalPresentation[CBool](renderer: SdlRenderer, width: U32, height: U32, mode: U32 /* C Enum */)
+use @SDL_SetRenderLogicalPresentation[CBool](renderer: SdlRenderer, width: I32, height: I32, mode: U32 /* C Enum */)
 use @SDL_SetRenderVSync[CBool](renderer: SdlRenderer, vsync: I32)
 use @SDL_PollEvent[CBool](event: SdlEvent tag)
 use @SDL_ConvertEventToRenderCoordinates[CBool](renderer: SdlRenderer, event: SdlEvent tag)
@@ -44,6 +45,14 @@ type CBool is U32
 primitive SdlInitVideo
   fun apply(): U32 => 0x20
 type SdlInitFlags is SdlInitVideo
+
+primitive SdlBlendmodeBlend
+  fun apply(): U32 => 1
+type SdlBlendmode is SdlBlendmodeBlend
+
+primitive SdlLogicalPresentationIntegerScale
+  fun apply(): U32 => 4
+type SdlRenderLogicalPresentation is SdlLogicalPresentationIntegerScale
 
 type SdlDisplayID is U32
 
