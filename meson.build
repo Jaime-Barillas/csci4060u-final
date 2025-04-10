@@ -116,6 +116,7 @@ if ponyc.found()
   pony_sources = files(
     'pony/main.pony',
     'pony/sdl.pony',
+    'pony/ui.pony',
   )
 
   final_pony = custom_target('final-pony',

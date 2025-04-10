@@ -1,5 +1,7 @@
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
+#include <new>
 
 #include <SDL3/SDL_render.h>
 #include <SDL3/SDL_rect.h>
@@ -16,7 +18,7 @@ static int text_height(mu_Font) {
   return SDL_DEBUG_TEXT_FONT_CHARACTER_SIZE;
 }
 
-Ui::Ui() : ctx{new mu_Context},
+Ui::Ui() : ctx{nullptr},
            pcount{400},
            time_step{TIMESTEP_STEP * 6},
            sim_steps{2},
@@ -24,13 +26,16 @@ Ui::Ui() : ctx{new mu_Context},
            frame_time_sim{0.0f},
            frame_time_step{0.0f},
            draw_ui{true} {
+  ctx = static_cast<mu_Context*>(malloc(sizeof(mu_Context)));
   mu_init(ctx);
   ctx->text_width = text_width;
   ctx->text_height = text_height;
 }
 
 Ui::~Ui() {
-  delete ctx;
+  if (ctx) {
+    free(ctx);
+  }
 }
 
 void Ui::update_mouse_pos(int32_t x, int32_t y) {
@@ -139,4 +144,50 @@ void Ui::execute_draw_cmds(SDL_Renderer *r) {
 void Ui::draw(SDL_Renderer *r) {
   enqueue_draw_cmds();
   execute_draw_cmds(r);
+}
+
+
+
+// Pony API
+extern "C" {
+
+Ui *UI_create_ui() {
+  Ui *ptr = static_cast<Ui*>(malloc(sizeof(Ui)));
+  return new(ptr) Ui{};
+}
+
+void UI_destroy_ui(Ui *ptr) {
+  if (ptr) {
+    ptr->~Ui();
+    free(ptr);
+  }
+}
+
+float UI_get_pcount(Ui *ptr) { return ptr->pcount; }
+float UI_get_time_step(Ui *ptr) { return ptr->time_step; }
+float UI_get_sim_steps(Ui *ptr) { return ptr->sim_steps; }
+float UI_get_gravity_y(Ui *ptr) { return ptr->gravity_y; }
+
+void UI_set_frame_time_sim(Ui *ptr, float frame_time_sim) {
+  ptr->frame_time_sim = frame_time_sim;
+}
+
+void UI_set_frame_time_step(Ui *ptr, float frame_time_step) {
+  ptr->frame_time_step = frame_time_step;
+}
+
+void UI_update_mouse_pos(Ui *ptr, int32_t x, int32_t y) {
+  ptr->update_mouse_pos(x, y);
+}
+
+void UI_update_mouse_down(Ui *ptr, int32_t x, int32_t y) {
+  ptr->update_mouse_down(x, y);
+}
+
+void UI_update_mouse_up(Ui *ptr, int32_t x, int32_t y) {
+  ptr->update_mouse_up(x, y);
+}
+
+void UI_draw(Ui *ptr, SDL_Renderer *r) { ptr->draw(r); }
+
 }

@@ -15,6 +15,7 @@ actor Main
   let _env: Env
   let _pin_auth: PinUnpinActorAuth
   let _ev: SdlEvent = SdlEvent
+  let _ui: Ui = Ui
   var _w: SdlWindow = SdlWindow
   var _r: SdlRenderer = SdlRenderer
   var should_quit: Bool = false
@@ -37,8 +38,8 @@ actor Main
     end
 
     if init_SDL() then
-      // init_ui()
       // init_sim()
+      _env.out.print("Init_SDL success")
       iterate()
     else
       _env.exitcode(1)
@@ -55,11 +56,15 @@ actor Main
       @SDL_ConvertEventToRenderCoordinates(_r, _ev)
       match _ev.event_type()
       | let _: SdlEventQuit => should_quit = true
+      | let _: SdlEventMouseMotion => _ui.update_mouse_pos(_ev.x(), _ev.y())
+      | let _: SdlEventMouseButtonDown => _ui.update_mouse_down(_ev.x(), _ev.y())
+      | let _: SdlEventMouseButtonUp => _ui.update_mouse_up(_ev.x(), _ev.y())
       end
     end
 
     @SDL_SetRenderDrawColor(_r, 12, 12, 64, 255)
     @SDL_RenderClear(_r)
+    _ui.draw(_r)
     @SDL_RenderPresent(_r)
 
     iterate()
