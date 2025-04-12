@@ -4,4 +4,7 @@
 subprojects/**
 !subprojects/*.wrap
 !subprojects/
+!subprojects/packagefiles/*/meson.build
+!subprojects/packagefiles/
+!subprojects/packagefiles/*
 
