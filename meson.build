@@ -90,6 +90,7 @@ executable(cpp_exe_parallel,
 # Pony Program
 # ##############
 ponyc = find_program('ponyc', version: '>=0.58.10', required: false)
+fork_join = subproject('fork_join')
 
 if ponyc.found()
   pony_exe = 'final-pony'
@@ -105,8 +106,10 @@ if ponyc.found()
   endif
 
   pony_opts += [
+    '--debug',
     '--path', fs.parent(libui.full_path()),
     '--path', fs.parent(sdl3_lib.full_path()),
+    '--path', fork_join.get_variable('fork_join_path'),
     '--output', '@OUTDIR@',
     '--bin-name', pony_exe
   ]
@@ -117,6 +120,7 @@ if ponyc.found()
     'pony/main.pony',
     'pony/sdl.pony',
     'pony/ui.pony',
+    'pony/sim.pony',
   )
 
   final_pony = custom_target('final-pony',

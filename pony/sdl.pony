@@ -31,6 +31,7 @@ use @SDL_ConvertEventToRenderCoordinates[CBool](renderer: SdlRenderer, event: Sd
 use @SDL_SetRenderDrawColor[CBool](renderer: SdlRenderer, r: U8, g: U8, b: U8, a: U8)
 use @SDL_RenderClear[CBool](renderer: SdlRenderer)
 use @SDL_RenderPresent[CBool](renderer: SdlRenderer)
+use @SDL_RenderFillRect[CBool](renderer: SdlRenderer, rect: SdlFRect tag)
 
 type CBool is U8
 
@@ -53,6 +54,12 @@ struct SdlRect
   var y: I32 = 0
   var w: I32 = 0
   var h: I32 = 0
+
+struct SdlFRect
+  var x: F32 = 0
+  var y: F32 = 0
+  var w: F32 = 0
+  var h: F32 = 0
 
 primitive _SdlWindow
 type SdlWindow is Pointer[_SdlWindow] tag

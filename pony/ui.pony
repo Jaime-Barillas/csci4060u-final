@@ -24,7 +24,7 @@ class Ui
 
   fun ref destroy() => @UI_destroy_ui(_ui)
 
-  fun pcount(): F32 => @UI_get_pcount(_ui)
+  fun pcount(): I32 => @UI_get_pcount(_ui).i32()
   fun time_step(): F32 => @UI_get_time_step(_ui)
   fun sim_steps(): F32 => @UI_get_sim_steps(_ui)
   fun gravity_y(): F32 => @UI_get_gravity_y(_ui)

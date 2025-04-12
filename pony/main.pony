@@ -1,5 +1,6 @@
 use "actor_pinning"
 use "runtime_info"
+use "time"
 
 primitive C
   fun height(): I32 => 720
@@ -14,22 +15,28 @@ primitive C
 actor Main
   let _env: Env
   let _pin_auth: PinUnpinActorAuth
+  let _sim: Sim
   let _ev: SdlEvent = SdlEvent
   let _ui: Ui = Ui
   var _w: SdlWindow = SdlWindow
   var _r: SdlRenderer = SdlRenderer
-  var should_quit: Bool = false
+  var _should_quit: Bool = false
+  var _old_time: U64
 
   new create(env: Env) =>
+    let sched_auth = SchedulerInfoAuth(env.root)
     _env = env
     _pin_auth = PinUnpinActorAuth(env.root)
+    _sim = Sim(this, C.width().f32(), C.height().f32(), sched_auth)
 
     // Print the number of _maximum_ scheduler threads.
-    let num_schedulers = Scheduler.schedulers(SchedulerInfoAuth(_env.root))
+    let num_schedulers = Scheduler.schedulers(sched_auth)
     _env.out.print("Parallelism Level: " + num_schedulers.string())
 
     ActorPinning.request_pin(_pin_auth)
     await_pinned_then_init()
+
+    _old_time = Time.micros()
 
   be await_pinned_then_init() =>
     if not ActorPinning.is_successfully_pinned(_pin_auth) then
@@ -38,36 +45,72 @@ actor Main
     end
 
     if init_SDL() then
-      // init_sim()
-      _env.out.print("Init_SDL success")
-      iterate()
+      iterate(reset_particles(_ui.pcount().usize()))
     else
       _env.exitcode(1)
       cleanup()
     end
 
-  be iterate() =>
-    if should_quit then
+  be iterate(ps: Array[Particle] val) =>
+    if _should_quit then
       cleanup()
       return
     end
 
+    // FIXME: Currently dt includes drawing. It shouldn't.
+    let new_time = Time.micros()
+    let dt = new_time - _old_time
+    _old_time = new_time
+    _ui.set_frame_time_sim((dt.f32() / 10e6)) // TODO: Double check
+
     while @SDL_PollEvent(_ev) != 0 do
       @SDL_ConvertEventToRenderCoordinates(_r, _ev)
       match _ev.event_type()
-      | let _: SdlEventQuit => should_quit = true
+      | let _: SdlEventQuit => _should_quit = true
       | let _: SdlEventMouseMotion => _ui.update_mouse_pos(_ev.x(), _ev.y())
       | let _: SdlEventMouseButtonDown => _ui.update_mouse_down(_ev.x(), _ev.y())
       | let _: SdlEventMouseButtonUp => _ui.update_mouse_up(_ev.x(), _ev.y())
       end
     end
 
+    _sim.simulate(ps)
+
+  be draw(ps: Array[Particle] val) =>
+    let rect = SdlFRect
+    let half_psize = SC.particle_size().f32() / 2.0
+    rect.w = SC.particle_size().f32()
+    rect.h = SC.particle_size().f32()
+
     @SDL_SetRenderDrawColor(_r, 12, 12, 64, 255)
     @SDL_RenderClear(_r)
     _ui.draw(_r)
+    for p in ps.values() do
+      rect.x = p.x - half_psize
+      rect.y = p.y - half_psize
+      @SDL_RenderFillRect(_r, rect)
+    end
     @SDL_RenderPresent(_r)
 
-    iterate()
+    iterate(ps)
+
+  fun reset_particles(count: USize): Array[Particle] val =>
+    let next_multiple = (count.f32() / (16.0 * 10.0)).sqrt().ceil().usize()
+    let cols = next_multiple * 16
+    let rows = next_multiple * 10
+    let pos_step = SC.particle_size().f32() * 1.25
+
+    let ps: Array[Particle] trn = Array[Particle](count)
+    let half_x = C.width().f32()
+    let half_y = C.height().f32()
+    var i: USize = 0
+    while i < count do
+      let x = ((half_x / 2.0) + ((i % cols).f32() * pos_step)) - ((cols / 2).f32() * pos_step)
+      let y = ((half_y / 2.0) + ((i / cols).f32() * pos_step)) - ((rows / 2).f32() * pos_step)
+      ps.push(Particle(x, y))
+
+      i = i + 1
+    end
+    consume ps
 
   fun ref init_SDL(): Bool =>
     if @SDL_Init(SdlInitVideo()) == 0 then
