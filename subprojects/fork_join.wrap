@@ -1,0 +1,9 @@
+[wrap-git]
+url = https://github.com/ponylang/fork_join
+revision = aadad18527c2497df80c7dfc0f3f797fd95a2338
+depth = 1
+patch_directory = fork_join
+
+[provide]
+dependency_names = fork_join
+
