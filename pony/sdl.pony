@@ -1,5 +1,4 @@
-use "lib:SDL3"             if not windows
-use "lib:libSDL3"          if windows
+use "lib:SDL3"
 
 use "lib:version"        if windows
 use "lib:Imm32"          if windows

@@ -71,7 +71,8 @@ executable(cpp_exe_sequential,
   cpp_args: cpp_args_sequential,
   link_args: cpp_link_args,
   build_rpath: '$ORIGIN',
-  dependencies: [sdl3, microui]
+  dependencies: [sdl3, microui],
+  install: true,
 )
 
 executable(cpp_exe_parallel,
@@ -81,7 +82,8 @@ executable(cpp_exe_parallel,
   cpp_args: cpp_args_parallel,
   link_args: cpp_link_args,
   build_rpath: '$ORIGIN',
-  dependencies: [sdl3, microui]
+  dependencies: [sdl3, microui],
+  install: true,
 )
 
 
@@ -94,6 +96,7 @@ fork_join = subproject('fork_join')
 
 if ponyc.found()
   pony_exe = 'final-pony'
+  pony_output = pony_exe
   pony_opts = []
 
   if get_option('debug') == true
@@ -101,12 +104,11 @@ if ponyc.found()
   endif
 
   if host_machine.system() == 'windows'
-    pony_exe += '.exe'
+    pony_output += '.exe'
     pony_opts += '-DUSE_VULKAN_RENDERER'
   endif
 
   pony_opts += [
-    '--debug',
     '--path', fs.parent(libui.full_path()),
     '--path', fs.parent(sdl3_lib.full_path()),
     '--path', fork_join.get_variable('fork_join_path'),
@@ -124,7 +126,7 @@ if ponyc.found()
   )
 
   final_pony = custom_target('final-pony',
-    output: pony_exe,
+    output: pony_output,
     input: pony_sources,
     build_by_default: true,
     depends: libui,
@@ -132,7 +134,9 @@ if ponyc.found()
       ponyc,
       pony_opts,
       '@SOURCE_ROOT@/pony',
-    ]
+    ],
+    install: true,
+    install_dir: get_option('bindir'),
   )
 endif
 
