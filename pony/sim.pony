@@ -2,6 +2,7 @@ use "debug"
 use "collections" // Range
 use "runtime_info"
 use "fork_join"
+use "time"
 
 use @printf[None](s: Pointer[U8] tag, ...)
 
@@ -80,6 +81,10 @@ actor Sim
   var _old_ps: Array[Particle] val
   var _ps: Array[Particle] iso
 
+  var _collect_time: Bool = true
+  var _old_time: U64 = 0
+  var _new_time: U64 = 0
+
   new create(main: Main,
              bound_x: F32,
              bound_y: F32,
@@ -98,6 +103,7 @@ actor Sim
 
   // Calculate densities and pressures
   be simulate(old_ps: Array[Particle] val) =>
+    _old_time = Time.micros()
     // We can't modify val arrays so we make an iso copy to use with the
     // fork_join library.
     _old_ps = old_ps
@@ -128,13 +134,14 @@ actor Sim
 
   be finish_sim(new_ps: UpdatedParticles) =>
     _sim_steps_taken = _sim_steps_taken + 1
+    _new_time = Time.micros()
 
     if _sim_steps_taken < _sim_steps then
       // Again!
       simulate(consume new_ps)
     else
       _sim_steps_taken = 0
-      _main.draw(consume new_ps)
+      _main.draw(consume new_ps, _new_time - _old_time)
     end
 
 class ParticleWorker is Worker[ParticleBatch, UpdatedParticles]

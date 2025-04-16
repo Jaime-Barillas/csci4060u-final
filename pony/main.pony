@@ -7,6 +7,7 @@ use "time"
 primitive C
   fun height(): I32 => 720
   fun width(): I32 => (C.height() * 16) / 10
+  fun frame_buf_size(): USize => 60
   fun renderer_name(): Pointer[U8] tag =>
     ifdef "USE_VULKAN_RENDERER" then
       "vulkan,software".cstring()
@@ -24,9 +25,10 @@ actor Main
   var _r: SdlRenderer = SdlRenderer
   var _should_quit: Bool = false
   var _old_time: U64
+  var _new_time: U64
 
-  let _sim_times: Array[F32] = Array[F32].init(0, 10)
-  let _step_times: Array[F32] = Array[F32].init(0, 10)
+  let _sim_times: Array[F32] = Array[F32].init(0, C.frame_buf_size())
+  let _step_times: Array[F32] = Array[F32].init(0, C.frame_buf_size())
   var _sim_times_idx: USize = 0
   var _step_times_idx: USize = 0
 
@@ -44,6 +46,7 @@ actor Main
     await_pinned_then_init()
 
     _old_time = Time.micros()
+    _new_time = _old_time
 
   be await_pinned_then_init() =>
     if not ActorPinning.is_successfully_pinned(_pin_auth) then
@@ -58,32 +61,38 @@ actor Main
       cleanup()
     end
 
-  be iterate(ps: Array[Particle] val) =>
+  be iterate(ps': Array[Particle] val, step_time: F32 = 0) =>
     if _should_quit then
       cleanup()
       return
     end
 
-    // FIXME: Currently dt includes drawing. It shouldn't.
-    let new_time = Time.micros()
-    let dt = (new_time - _old_time).f32() / 10e6
-    _old_time = new_time
+    var ps = ps'
+
+    // FIXME: check millis conversion.
+    let dt = (_new_time - _old_time).f32() / 10e5
+    _old_time = Time.micros()
 
     var step_time_tot: F32 = 0
     var sim_time_tot: F32 = 0
     try
       _sim_times(_sim_times_idx)? = dt
-      _step_times(_step_times_idx)? = dt
-      _sim_times_idx = (_sim_times_idx + 1).mod(_sim_times.size())
-      _step_times_idx = (_step_times_idx + 1).mod(_step_times.size())
+      _step_times(_step_times_idx)? = step_time
+      _sim_times_idx = (_sim_times_idx + 1).mod(C.frame_buf_size())
+      _step_times_idx = (_step_times_idx + 1).mod(C.frame_buf_size())
 
       for i in Range(0, _sim_times.size()) do
         sim_time_tot = sim_time_tot + _sim_times(i)?
         step_time_tot = step_time_tot + _step_times(i)?
       end
     end
-    _ui.set_frame_time_sim(sim_time_tot / 10.0) // TODO: Double check
-    _ui.set_frame_time_step((step_time_tot / 10.0)) // TODO: Double check
+    _ui.set_frame_time_sim(sim_time_tot / C.frame_buf_size().f32())
+    _ui.set_frame_time_step(step_time_tot / C.frame_buf_size().f32())
+
+    if _ui.pcount().usize() != ps.size() then
+      ps = reset_particles(_ui.pcount().usize())
+      _sim.set_pcount(_ui.pcount().usize())
+    end
 
     while @SDL_PollEvent(_ev) != 0 do
       @SDL_ConvertEventToRenderCoordinates(_r, _ev)
@@ -99,7 +108,9 @@ actor Main
     _sim.set_gravity_y(-_ui.gravity_y())
     _sim.simulate(ps)
 
-  be draw(ps: Array[Particle] val) =>
+  be draw(ps: Array[Particle] val, step_time: U64 = 0) =>
+    _new_time = Time.micros()
+
     let rect = SdlFRect
     let half_psize = SC.particle_size().f32() / 2.0
     rect.w = SC.particle_size().f32()
@@ -115,7 +126,7 @@ actor Main
     end
     @SDL_RenderPresent(_r)
 
-    iterate(ps)
+    iterate(ps, step_time.f32() / 10e5)
 
   fun reset_particles(count: USize): Array[Particle] val =>
     let next_multiple = (count.f32() / (16.0 * 10.0)).sqrt().ceil().usize()

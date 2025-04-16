@@ -27,7 +27,7 @@
 
 constexpr int HEIGHT{720};
 constexpr int WIDTH{(HEIGHT * 16) / 10};
-constexpr int AVG_FPS_BUF_SIZE = 15;
+constexpr int AVG_FPS_BUF_SIZE = 60;
 
 SDL_Window *w{nullptr};
 SDL_Renderer *r{nullptr};
@@ -76,6 +76,11 @@ int main(int, char**) {
   uint32_t step_time_idx = 0;
   float sim_time_total;
   float step_time_total;
+
+  for (int32_t i = 0; i < AVG_FPS_BUF_SIZE; i++) {
+    sim_times[i] = 0;
+    step_times[i] = 0;
+  }
 
   // NOTE: In SDL3, +y goes down so ui.gravity_y needs to be negated to match.
   Simulator sim(WIDTH, HEIGHT, ui.pcount, ui.time_step, ui.sim_steps, -ui.gravity_y);
