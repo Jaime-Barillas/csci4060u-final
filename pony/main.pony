@@ -1,3 +1,4 @@
+use "debug"
 use "actor_pinning"
 use "runtime_info"
 use "time"
@@ -106,7 +107,7 @@ actor Main
     while i < count do
       let x = ((half_x / 2.0) + ((i % cols).f32() * pos_step)) - ((cols / 2).f32() * pos_step)
       let y = ((half_y / 2.0) + ((i / cols).f32() * pos_step)) - ((rows / 2).f32() * pos_step)
-      ps.push(Particle(x, y))
+      ps.push(Particle(x, y, 0, 0, 0, 0))
 
       i = i + 1
     end
