@@ -74,6 +74,7 @@ actor Sim
   var _time_step: F32 = 60.0
   var _sim_steps: I32 = 2
   var _gravity_y: F32 = -9.8
+  var _sim_steps_taken: I32 = 0
 
   let _sched_auth: SchedulerInfoAuth
   var _old_ps: Array[Particle] val
@@ -117,7 +118,7 @@ actor Sim
     let new_ps = Util.iso_copy(_old_ps)
 
     let job = Job[ParticleBatch, UpdatedParticles](
-      ParticleWorkerBuilder2(1.0 / _time_step),
+      ParticleWorkerBuilder2(1.0 / _time_step, _gravity_y),
       ParticleBatcher((consume new_ps, _old_ps)),
       ArrayCollector2(this, _old_ps.size()),
       _sched_auth
@@ -125,7 +126,16 @@ actor Sim
 
     job.start()
 
-  be finish_sim(new_ps: UpdatedParticles) => _main.draw(consume new_ps)
+  be finish_sim(new_ps: UpdatedParticles) =>
+    _sim_steps_taken = _sim_steps_taken + 1
+
+    if _sim_steps_taken < _sim_steps then
+      // Again!
+      simulate(consume new_ps)
+    else
+      _sim_steps_taken = 0
+      _main.draw(consume new_ps)
+    end
 
 class ParticleWorker is Worker[ParticleBatch, UpdatedParticles]
   let _dt: F32
@@ -215,13 +225,15 @@ class ParticleBatcher is Generator[ParticleBatch]
 
 class ParticleWorker2 is Worker[ParticleBatch, UpdatedParticles]
   let _dt: F32
+  let _gravity: F32
   var _batch: Array[Particle] iso = Array[Particle]
   var _neighbours: Array[Particle] val = Array[Particle]
 
   var debug: Bool = true
 
-  new iso create(dt: F32) =>
+  new iso create(dt: F32, gravity: F32) =>
     _dt = dt
+    _gravity = gravity
 
   fun ref receive(work_set: ParticleBatch) =>
     (_batch, _neighbours) = consume work_set
@@ -247,27 +259,31 @@ class ParticleWorker2 is Worker[ParticleBatch, UpdatedParticles]
 
           let pj = _neighbours(j)?
           let d = p.distance_to(pj)
-          if (d < sr) then
+          if ((d < sr) and (d.abs() > 0.000001)) then
             var r = sr - d
 
             // Viscosity
-            let rel_visc = ((pj.vx - p.vx) / pj.density)
+            let rel_visc_x = ((pj.vx - p.vx) / pj.density)
+            let rel_visc_y = ((pj.vy - p.vy) / pj.density)
             let vmult = (mass * visc * viscosity * r)
-            vforce_x = vforce_x + (rel_visc * vmult)
-            vforce_y = vforce_y + (rel_visc * vmult)
+            vforce_x = vforce_x + (rel_visc_x * vmult)
+            vforce_y = vforce_y + (rel_visc_y * vmult)
 
             // Pressures
             r = r.powi(3)
             let rel_p = ((pj.pressure + p.pressure) / (2 * pj.density))
             let pmult = (0.05 * mass * spiky * r)
-            pforce_x = pforce_x + (rel_p * pmult)
-            pforce_y = pforce_y + (rel_p * pmult)
+            let dx = (pj.x - p.x) / d
+            let dy = (pj.y - p.y) / d
+            pforce_x = pforce_x + (dx * rel_p * pmult)
+            pforce_y = pforce_y + (dy * rel_p * pmult)
           end
         end
 
-        gforce_y = gforce_y + ((0.1 * 9.8 * mass) / p.density)
-        let force_x = pforce_x + vforce_x
-        let force_y = pforce_y + vforce_y + gforce_y
+        // Something is wrong with the math here such that this needs a 0.005 multiplier.
+        gforce_y = (0.1 * _gravity * mass) / p.density
+        let force_x = (pforce_x + vforce_x) * 0.005
+        let force_y = (pforce_y + vforce_y + gforce_y) * 0.005
 
         let accel_x = (force_x / p.density)
         let accel_y = (force_y / p.density)
@@ -281,7 +297,7 @@ class ParticleWorker2 is Worker[ParticleBatch, UpdatedParticles]
           vel_x = vel_x * SC.bound_damping()
         end
         if ((pos_y < 0) or (pos_y > 720)) then
-          pos_y = pos_y.min(1152).max(0)
+          pos_y = pos_y.min(720).max(0)
           vel_y = vel_y * SC.bound_damping()
         end
 
@@ -293,9 +309,13 @@ class ParticleWorker2 is Worker[ParticleBatch, UpdatedParticles]
 
 class ParticleWorkerBuilder2 is WorkerBuilder[ParticleBatch, UpdatedParticles]
   let _dt: F32
+  let _gravity: F32
 
-  new create(dt: F32) => _dt = dt
-  fun ref apply(): ParticleWorker2 iso^ => ParticleWorker2(_dt)
+  new create(dt: F32, gravity: F32) =>
+    _dt = dt
+    _gravity = gravity
+
+  fun ref apply(): ParticleWorker2 iso^ => ParticleWorker2(_dt, _gravity)
 
 class iso ArrayCollector2 is Collector[ParticleBatch, UpdatedParticles]
   let _sim: Sim

@@ -1,3 +1,4 @@
+use "collections"
 use "debug"
 use "actor_pinning"
 use "runtime_info"
@@ -23,6 +24,11 @@ actor Main
   var _r: SdlRenderer = SdlRenderer
   var _should_quit: Bool = false
   var _old_time: U64
+
+  let _sim_times: Array[F32] = Array[F32].init(0, 10)
+  let _step_times: Array[F32] = Array[F32].init(0, 10)
+  var _sim_times_idx: USize = 0
+  var _step_times_idx: USize = 0
 
   new create(env: Env) =>
     let sched_auth = SchedulerInfoAuth(env.root)
@@ -60,9 +66,24 @@ actor Main
 
     // FIXME: Currently dt includes drawing. It shouldn't.
     let new_time = Time.micros()
-    let dt = new_time - _old_time
+    let dt = (new_time - _old_time).f32() / 10e6
     _old_time = new_time
-    _ui.set_frame_time_sim((dt.f32() / 10e6)) // TODO: Double check
+
+    var step_time_tot: F32 = 0
+    var sim_time_tot: F32 = 0
+    try
+      _sim_times(_sim_times_idx)? = dt
+      _step_times(_step_times_idx)? = dt
+      _sim_times_idx = (_sim_times_idx + 1).mod(_sim_times.size())
+      _step_times_idx = (_step_times_idx + 1).mod(_step_times.size())
+
+      for i in Range(0, _sim_times.size()) do
+        sim_time_tot = sim_time_tot + _sim_times(i)?
+        step_time_tot = step_time_tot + _step_times(i)?
+      end
+    end
+    _ui.set_frame_time_sim(sim_time_tot / 10.0) // TODO: Double check
+    _ui.set_frame_time_step((step_time_tot / 10.0)) // TODO: Double check
 
     while @SDL_PollEvent(_ev) != 0 do
       @SDL_ConvertEventToRenderCoordinates(_r, _ev)
@@ -74,6 +95,8 @@ actor Main
       end
     end
 
+    _sim.set_sim_steps(_ui.sim_steps().i32())
+    _sim.set_gravity_y(-_ui.gravity_y())
     _sim.simulate(ps)
 
   be draw(ps: Array[Particle] val) =>
