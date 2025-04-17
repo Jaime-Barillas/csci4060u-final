@@ -1,5 +1,4 @@
 .clangd
-*.pdf
 
 subprojects/**
 !subprojects/*.wrap

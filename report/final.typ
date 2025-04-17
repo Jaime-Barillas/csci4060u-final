@@ -290,56 +290,97 @@ The overall approach to simulating particle based fluids is as follows:
     velocity, and ultimately, position.
 + Draw each particle on screen.
 
+The code for each implementation is available at: https://github.com/Jaime-Barillas/csci4060u-final
 
------
+== The C++ Implementation
 
-  + message passing
-+ Scheduler threads
-  + Work stealing
-+ Reference Capabilities
-  + iso, val, ref, tag
-  + box, trn
-  + aliasing (e.g. safe to alias iso as tag (iso!))
+The main function drives the app by calling the ```cpp simulate()``` function
+of the ```cpp Sim``` class every frame. The ```cpp step()``` function of the
+```cpp Sim``` class is responsible for a single simulation step which goes
+through each of the iterations mentioned above. The ```cpp Sim``` class
+maintains a single array of particle objects throughout.
+#figure(image("simloop.png"))
 
-/*
+The code is a bit gnarly it will not be included in full for this report.
+Please visit the github repo to see it. The outer loops that iterate each
+particle are parallelized with the use of OpenMP's `parallel for` construct.
+The inner loops that iterate neighbours are not parallelized. Doing this
+allows OpenMP to split the work into batches that are processed
+simultaneously, which greatly speeds up the computation.
+
 #code.insert(
-  "../pony/main.pony",
-  "SDL_FFI",
-  lang: "pony",
-  caption: [Function wrappers...]
+  "../cpp/simulator.cpp",
+  "cpploop",
+  lang: "cpp",
+  caption: [Using OpenMP's parallel for. cpp/simulator.cpp line \~65.]
 )
-#code.insert(
-  "../pony/main.pony",
-  "pinning",
-  lang: "pony",
-  caption: [To run on the main thread...],
+
+It is worth noting that the iteration of the neighbours is a nested loop
+over all particles. This results in $O(n^2)$ runtime per simulation step
+where $n$ is the number of particles. This is by-far the most significant
+source of slowdown with higher particle counts (The sequential C++
+implementation struggles to hit 60fps at 400 particles, the parallel version
+can reach 600 particles with 60fps or more).
+
+== The Pony Implementation
+
+This one is particularly rough. In an attempt to batch the work similar to
+how the C++ program does it, Pony's "fork_join" library is used to batch the
+work across worker actors. The idea is to keep an array of particle objects
+within the ```pony Sim``` actor to update every frame. But, in order to use
+the fork_join library and parallelize the computations, we need to split this
+array up and distribute it across worker actors, then merge the batches back
+into one for drawing. Additionally, reviewing the approach outlined in "The
+Common Plan" above, each iteration needs access to the neighbouring particles
+to perform its computation.
+
+\
+
+This is where we run into difficulty with Pony's reference capabilities:
+- The particle array and its batches need to be mutable and sharable. Use
+  the ```pony iso``` capability.
+- The particle array will be split up into batches for parallel computation
+  spread across worker actors.
+- Each worker actor needs a copy of the entire particle array for the
+  calculations that require knowledge of the neighbouring particles.
+  - So we need a reference to the original array, _but the array needs to
+    be defined as ```pony iso```_ which doesn't allow multiple references.
+  - Ergo, we need to make a copy of the particle array.
+
+I will again defer to the #link("https://github.com/Jaime-Barillas/csci4060u-final/blob/main/pony/sim.pony", [github repo (link, click me)])
+to see the code for the ```pony Sim``` actor and associated code.
+Unfortunately, the copy of the particle array needs to be done twice to
+account for the three iterations over the particles (the two that calculate
+forces and particle positions can be merged) due to how the latter two loops
+require density information calculated in the first loop. This _murders_
+performance and consumes memory _fast_, so don't run the Pony version for long.
+A different approach to try would be to not imitate how OpenMP batches work and
+instead represent every particle as its own actor.
+
+== Results
+
+The numbers bellow were taken from on a machine with an i7 7700HQ processor
+(4 cores, 8 Threads):
+#figure(
+  table(
+    columns: (auto, auto, auto, auto, auto),
+    table.header(
+      [], [C++ (Sequential)], [C++ (Parallel)], [Pony (1 Thread)], [Pony (4 Threads)]
+    ),
+    [*Particle Count*], [400], [400], [400], [400],
+    [*FPS (Simulation Step)*], [72], [290], [110], [270],
+    [*Speed Up*], [1x], [4.02x], [1.52x], [3.75x (2.45x from Pony (1 Thread))]
+  )
 )
-*/
 
-= ♪I Got 99 Problems and a Pony Ain't One...♪ It's Three.
-
-*!! The Pony version consumes memory like crazy! (All those copies made I
-guess) I don't have time to fix it. !!*
-
-Aaaaaand we hit the first problem virtually immediately! Pony does not have a
-way to directly exit the program.
-+ Want to quit if SDL initialization fails.
-+ No exit() without C FFI.
-+ Talk about quiescence.
-
-The second issue we run into is that many SDL3 functions expect to be run from
-the main thread. This is an issue for Pony as actors are not guaranteed to
-always run on the same thread.
-+ Scheduler threads.
-+ Message Queue.
-+ Work stealing.
-+ actor_pinning package.
-+ We could just hog a thread with a while loop.
-  - What about single core machines?
-  - Lose the ability to use _all_ cores on a machine.
-
-// See @pony:main.pony:pinning for cool code.
-
+The performance of the Pony programs degrades over time due to the afore
+mentioned problems, so those numbers are rough estimates at best. They are
+taken as the number that the program settles around in the first second or
+so of execution. It is interesting to note that the parallel C++ version scales
+linearly in performance yet the Pony version does not. Another interesting
+data point is that the single threaded Pony version is faster than the C++
+program. It is unfortunate that the current version of the Pony program is
+unstable so these numbers don't mean much.
 
 #bibliography("bibliography.bib")
 
