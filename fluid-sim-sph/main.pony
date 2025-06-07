@@ -1,4 +1,6 @@
+use "runtime_info"
 
 actor Main
   new create(env: Env) =>
-    env.out.print("Hello, World!")
+    let thread_count = Scheduler.schedulers(SchedulerInfoAuth(env.root))
+    env.out.print("Threads: " + thread_count.string())
