@@ -10,10 +10,7 @@ libmicroui = library('microui',
   include_directories: inc,
 )
 
-libmicroui_dep = declare_dependency(
+microui_dep = declare_dependency(
   include_directories: inc,
   link_with: libmicroui
 )
-
-meson.override_dependency('microui', libmicroui_dep)
-
