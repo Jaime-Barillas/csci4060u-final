@@ -62,6 +62,7 @@ libwrapper_path = fs.parent(libwrapper.full_path())
 # determine when to recompile.
 pony_sources = files(
   proj / 'main.pony',
+  proj / 'log' / 'log.pony',
   proj / 'sdl3' / 'sdl3.pony',
   proj / 'sdl3' / 'display.pony',
 )
@@ -77,7 +78,7 @@ if sdl3_path
 endif
 
 if get_option('debug')
-  pony_opts += '--debug'
+  pony_opts += ['--debug', '-DLogEnabled']
 endif
 
 if windows
