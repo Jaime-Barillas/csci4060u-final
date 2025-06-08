@@ -62,6 +62,8 @@ libwrapper_path = fs.parent(libwrapper.full_path())
 # determine when to recompile.
 pony_sources = files(
   proj / 'main.pony',
+  proj / 'sdl3' / 'sdl3.pony',
+  proj / 'sdl3' / 'display.pony',
 )
 pony_output = windows ? proj + '.exe' : proj
 pony_opts = [
