@@ -1,4 +1,6 @@
 .clangd
+.lsp/
+.clj-kondo/
 
 subprojects/**
 !subprojects/*.wrap
