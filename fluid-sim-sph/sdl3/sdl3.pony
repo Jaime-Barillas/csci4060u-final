@@ -17,12 +17,36 @@ use @SDL_GetError[Pointer[U8] ref]()
 /* Video */
 use @SDL_GetPrimaryDisplay[U32]()
 use @SDL_GetDisplayBounds[U8](display_id: U32, rect: SdlRect)
-use @SDL_CreateWindow[Window](title: Pointer[U8] tag, w: I32, h: I32, flags: U64)
-use @SDL_DestroyWindow[None](window: Window)
+use @SDL_CreateWindow[_Window](title: Pointer[U8] tag, w: I32, h: I32, flags: U64)
+use @SDL_DestroyWindow[None](window: _Window)
+
+use @SDL_CreateGPUDevice[_GpuDevice](format_flags: U32, debug_mode: U8, name: Pointer[U8] tag)
+use @SDL_DestroyGPUDevice[None](device: _GpuDevice)
+use @SDL_ClaimWindowForGPUDevice[U8](device: _GpuDevice, window: _Window)
+use @SDL_ReleaseWindowFromGPUDevice[None](device: _GpuDevice, window: _Window)
+use @SDL_AcquireGPUCommandBuffer[_GpuCommandBuffer](device: _GpuDevice)
+use @SDL_CancelGPUCommandBuffer[U8](command_buffer: _GpuCommandBuffer)
+// FIXME: Use non blocking variant? See warning in remarks of docs for
+//        SDL_AcquireGPUCommandBuffer.
+use @SDL_WaitAndAcquireGPUSwapchainTexture[U8](
+  command_buffer: _GpuCommandBuffer,
+  window: _Window,
+  swapchain_texture: Pointer[GpuTexture] tag,
+  swapchain_texture_width: Pointer[U32] tag,
+  swapchain_texture_height: Pointer[U32] tag
+)
+use @SDL_BeginGPURenderPass[_GpuRenderPass](
+  command_buffer: _GpuCommandBuffer,
+  color_target_infos: SdlGpuColorTargetInfo,
+  num_color_targets: U32,
+  depth_stencil_target_info: Pointer[None] tag // Not used
+)
+use @SDL_EndGPURenderPass[None](render_pass: _GpuRenderPass)
+use @SDL_SubmitGPUCommandBuffer[U8](command_buffer: _GpuCommandBuffer)
 
 /* Events */
-use @SDL_PollEvent[U8](event: Event)
-use @PSDL_ConvertEvent[Event ref](event: Event ref)
+use @SDL_PollEvent[U8](event: SdlEvent)
+use @PSDL_ConvertEvent[SdlEvent ref](event: SdlEvent ref)
 
 struct SdlRect
   var x: I32 = 0
@@ -30,8 +54,50 @@ struct SdlRect
   var w: I32 = 0
   var h: I32 = 0
 
-primitive _Window
-type Window is Pointer[_Window] tag
+primitive _WindowP
+type _Window is Pointer[_WindowP] tag
+
+primitive _GpuDeviceP
+type _GpuDevice is Pointer[_GpuDeviceP] tag
+
+primitive GpuShaderFormat
+  fun spirv(): U32 => 2
+
+primitive _GpuCommandBufferP
+type _GpuCommandBuffer is Pointer[_GpuCommandBufferP] tag
+
+primitive _GpuTextureP
+type GpuTexture is Pointer[_GpuTextureP] tag
+
+primitive SdlGpuLoadOp
+  fun clear(): U32 => 1
+
+primitive SdlGpuStoreOp
+  fun store(): U32 => 0
+
+struct SdlFColor
+  var r: F32 = 0
+  var g: F32 = 0
+  var b: F32 = 0
+  var a: F32 = 1
+
+struct SdlGpuColorTargetInfo
+  var texture: GpuTexture         = GpuTexture
+  var mip_level: U32              = 0
+  var layer_or_depth_plane: U32   = 0
+  embed clear_color: SdlFColor    = SdlFColor
+  var load_op: U32                = 0
+  var store_op: U32               = 0
+  var resolve_texture: GpuTexture = GpuTexture
+  var resolve_mip_level: U32      = 0
+  var resolve_layer: U32          = 0
+  var cycle: U8                   = 0
+  var cycle_resolve_texture: U8   = 0
+  var padding1: U8                = 0
+  var padding2: U8                = 0
+
+primitive _GpuRenderPassP
+type _GpuRenderPass is Pointer[_GpuRenderPassP] tag
 
 primitive EventType
   fun quit(): U32 => 0x100
@@ -40,7 +106,7 @@ primitive EventType
   fun mouse_button_up(): U32 => 0x402
 
 // NOTE: SDL_Event is padded to a size of 128 bytes.
-struct Event
+struct SdlEvent
   var kind:  U32 = 0
   var pad00: U32 = 0
   var pad01: U64 = 0
@@ -59,13 +125,13 @@ struct Event
   var pad14: U64 = 0
   var pad15: U64 = 0
 
-  fun ref as_mouse_motion_event(): MouseMotionEvent =>
-    @PSDL_ConvertEvent[MouseMotionEvent](this)
+  fun ref as_mouse_motion_event(): SdlMouseMotionEvent =>
+    @PSDL_ConvertEvent[SdlMouseMotionEvent](this)
 
-  fun ref as_mouse_button_event(): MouseButtonEvent =>
-    @PSDL_ConvertEvent[MouseButtonEvent](this)
+  fun ref as_mouse_button_event(): SdlMouseButtonEvent =>
+    @PSDL_ConvertEvent[SdlMouseButtonEvent](this)
 
-struct MouseMotionEvent
+struct SdlMouseMotionEvent
   var kind:  U32 = 0
   var pad00: U32 = 0 // reserved
   var pad01: U64 = 0 // timestamp
@@ -87,7 +153,7 @@ struct MouseMotionEvent
   var pad13: U64 = 0
   var pad14: U64 = 0
 
-struct MouseButtonEvent
+struct SdlMouseButtonEvent
   var kind:  U32 = 0
   var pad00: U32 = 0 // reserved
   var pad01: U64 = 0 // timestamp

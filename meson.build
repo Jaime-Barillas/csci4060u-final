@@ -65,6 +65,7 @@ pony_sources = files(
   proj / 'log' / 'log.pony',
   proj / 'sdl3' / 'sdl3.pony',
   proj / 'sdl3' / 'display.pony',
+  proj / 'sdl3' / 'window.pony',
 )
 pony_output = windows ? proj + '.exe' : proj
 pony_opts = [
