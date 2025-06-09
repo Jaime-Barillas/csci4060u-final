@@ -39,7 +39,7 @@ class SdlWindow
       colorti.clear_color.b = 1.0
       colorti.clear_color.a = 1.0
       colorti.load_op = SdlGpuLoadOp.clear()
-      colorti.load_op = SdlGpuStoreOp.store()
+      colorti.store_op = SdlGpuStoreOp.store()
 
       let render_pass = @SDL_BeginGPURenderPass(cmd_buf, colorti, 1, Pointer[None])
       @SDL_EndGPURenderPass(render_pass)
