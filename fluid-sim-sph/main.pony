@@ -1,5 +1,6 @@
 use "actor_pinning"
 use "debug"
+use "format"
 use "log"
 use "runtime_info"
 use "sdl3"
@@ -45,19 +46,16 @@ actor Main
 
       let display_bounds: Rect = Rect
       if not SDL.get_display_bounds(display_id, display_bounds) then error end
-      _log.info("Display Size: "
-                + display_bounds.w.string()
-                + ", "
-                + display_bounds.h.string())
+      _log.info(Format.msg(
+        "Display Size: {}, {}",
+        [display_bounds.w; display_bounds.h])
+      )
 
       let width = (display_bounds.w.i32() * 2) / 3
       let height = (display_bounds.h.i32() * 2) / 3
       _w = SDL.create_window("fluid-sim-sph", width, height, 0)
       if _w.is_null() then error end
-      _log.info("Window Size: "
-                + width.string()
-                + ", "
-                + height.string())
+      _log.info(Format.msg("Window Size: {}, {}", [width; height]))
 
       _d = SDL.create_gpu_device(GPUShaderFormat.spirv(), true)
       if _d.is_null() then error end

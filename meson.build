@@ -63,6 +63,7 @@ libwrapper_path = fs.parent(libwrapper.full_path())
 pony_sources = files(
   proj / 'main.pony',
   proj / 'log' / 'log.pony',
+  proj / 'format' / 'format.pony',
   proj / 'sdl3' / 'sdl3.pony',
 )
 pony_output = windows ? proj + '.exe' : proj
