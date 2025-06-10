@@ -64,11 +64,10 @@ pony_sources = files(
   proj / 'main.pony',
   proj / 'log' / 'log.pony',
   proj / 'sdl3' / 'sdl3.pony',
-  proj / 'sdl3' / 'display.pony',
-  proj / 'sdl3' / 'window.pony',
 )
 pony_output = windows ? proj + '.exe' : proj
 pony_opts = [
+  '--path', meson.global_source_root() / proj,
   '--path', microui_path,
   '--path', libwrapper_path,
   '--link-ldcmd', ld,
@@ -80,12 +79,6 @@ endif
 
 if get_option('debug')
   pony_opts += ['--debug', '-DLogEnabled']
-endif
-
-if windows
-  # The default renderer cannot draw text on Windows.
-  # TODO: Investigate if it's still an issue...
-  pony_opts += '-DUSE_VULKAN_RENDERER'
 endif
 
 message('ponyc opts: ' + ' '.join(pony_opts) + '\n')
