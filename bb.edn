@@ -14,10 +14,14 @@
   {:doc "Run project setup (args: --release)"
    :depends [-build-type]
    :task (let [build-path (fs/path "build" -build-type)]
-           (proc/shell {:continue true} "meson" "setup" build-path)
-           (when (= -build-type "release")
-             (proc/shell {:continue true}
-               "meson" "configure" build-path "-Dbuildtype=release")))}
+           (try
+             (proc/shell "meson" "setup" build-path)
+             (when (= -build-type "release")
+               (proc/shell
+                 "meson" "configure" build-path "-Dbuildtype=release"))
+             (catch Exception ex
+               (println (ex-message ex))
+               (System/exit 1))))}
 
   build
   {:doc "Compile the program (args: --release)"
@@ -25,13 +29,21 @@
    :task (if (seq (fs/modified-since
                     (fs/file "build" -build-type "fluid-sim-sph")
                     "fluid-sim-sph"))
-           (proc/shell {:continue true}
-             "meson" "compile" "-C" (fs/path "./build" -build-type)))}
+           (try
+             (proc/shell
+               "meson" "compile" "-C" (fs/path "./build" -build-type))
+             (catch Exception ex
+               (println (ex-message ex))
+               (System/exit 1))))}
 
   exe
   {:doc "Run the program (args: --release)"
    :depends [-build-type]
-   :task (proc/shell {:continue true}
-           (fs/path "build" -build-type "fluid-sim-sph"))}
+   :task (try
+           (proc/shell
+             (fs/path "build" -build-type "fluid-sim-sph"))
+             (catch Exception ex
+               (println (ex-message ex))
+               (System/exit 1)))}
 
   ,}}
