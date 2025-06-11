@@ -38,7 +38,7 @@
 
   exe
   {:doc "Run the program (args: --release)"
-   :depends [-build-type]
+   :depends [-build-type build]
    :task (try
            (proc/shell
              (fs/path "build" -build-type "fluid-sim-sph"))
