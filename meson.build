@@ -41,18 +41,23 @@ if not sdl3.found()
   sdl3_path = fs.parent(sdl3_proj.get_variable('sdl_lib').full_path())
 endif
 
-libwrapper_srcs = [
-  'c' / 'microui' / 'lib.c',
-  'c' / 'sdl3' / 'lib.c',
+libui_srcs = [
+  'c' / 'lib.c',
 ]
 
-libwrapper = static_library('wrapper',
-  libwrapper_srcs,
+libui_c_args = []
+if get_option('debug')
+  libui_c_args += ['-DLogEnabled']
+endif
+
+libui = static_library('ui',
+  libui_srcs,
   name_suffix: windows ? 'lib' : [], # ponyc requires .lib suffix on windows
   dependencies: [sdl3, microui],
+  c_args: libui_c_args,
 )
 
-libwrapper_path = fs.parent(libwrapper.full_path())
+libui_path = fs.parent(libui.full_path())
 
 
 ########
@@ -63,14 +68,12 @@ libwrapper_path = fs.parent(libwrapper.full_path())
 pony_sources = files(
   proj / 'main.pony',
   proj / 'log' / 'log.pony',
-  proj / 'format' / 'format.pony',
-  proj / 'sdl3' / 'sdl3.pony',
 )
 pony_output = windows ? proj + '.exe' : proj
 pony_opts = [
   '--path', meson.global_source_root() / proj,
   '--path', microui_path,
-  '--path', libwrapper_path,
+  '--path', libui_path,
   '--link-ldcmd', ld,
   '--output', '@OUTDIR@',
 ]
@@ -87,7 +90,7 @@ final_pony = custom_target(proj,
   output: pony_output,
   input: pony_sources,
   build_by_default: true,
-  depends: [libwrapper],
+  depends: [libui],
   command: [
     ponyc,
     pony_opts,
