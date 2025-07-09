@@ -1,9 +1,0 @@
-[wrap-git]
-url = https://github.com/rxi/microui
-revision = 0850aba860959c3e75fb3e97120ca92957f9d057
-depth = 1
-patch_directory = microui
-
-[provide]
-dependency_names = microui
-

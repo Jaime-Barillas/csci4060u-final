@@ -21,9 +21,6 @@ windows = host_machine.system() == 'windows'
 #################
 # C Wrapper Lib #
 #################
-microui_proj = subproject('microui', default_options: ['default_library=static'])
-microui = microui_proj.get_variable('microui_dep')
-microui_path = fs.parent(microui_proj.get_variable('libmicroui').full_path())
 # If sdl3 comes from meson's wrapdb, we need to pass the lib's path to the
 # Pony compiler, this is not necessary with the system level dependency. In
 # fact, it is not possible to get the path to the lib if dependency() is
@@ -53,7 +50,7 @@ endif
 libui = static_library('ui',
   libui_srcs,
   name_suffix: windows ? 'lib' : [], # ponyc requires .lib suffix on windows
-  dependencies: [sdl3, microui],
+  dependencies: [sdl3],
   c_args: libui_c_args,
 )
 
@@ -72,7 +69,6 @@ pony_sources = files(
 pony_output = windows ? proj + '.exe' : proj
 pony_opts = [
   '--path', meson.global_source_root() / proj,
-  '--path', microui_path,
   '--path', libui_path,
   '--link-ldcmd', ld,
   '--output', '@OUTDIR@',
