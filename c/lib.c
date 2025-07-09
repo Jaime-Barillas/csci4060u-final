@@ -33,18 +33,19 @@ SDL_GPUGraphicsPipeline * create_pipeline(const char *);
 
 
 /* Temporary Code */
+#define VERTEX_COUNT (6 * 500)
 void log_err(char * msg, ...);
 void log_info(char * msg, ...);
-struct Particle particles[1000];
+struct Particle particles[VERTEX_COUNT];
 void generate_particles(void) {
-  for (int i = 0; i < 1000; i++) {
+  for (int i = 0; i < VERTEX_COUNT; i++) {
     particles[i].x = (SDL_randf() * 2) - 1.0f;
     particles[i].y = (SDL_randf() * 2) - 1.0f;
     particles[i].z = (SDL_randf() * 2) - 1.0f;
   }
 }
 char upload_particles(void) {
-  const unsigned int particle_bytes = sizeof(struct Particle) * 1000;
+  const unsigned int particle_bytes = sizeof(particles);
   char success = 1;
 
 
@@ -89,7 +90,7 @@ char upload_particles(void) {
     success = 0;
     goto cleanup_tbuf;
   }
-  for (int i = 0; i < 1000; i++) {
+  for (int i = 0; i < VERTEX_COUNT; i++) {
     mapping[i] = particles[i];
   }
   SDL_UnmapGPUTransferBuffer(device, tbuf);
@@ -112,7 +113,7 @@ char upload_particles(void) {
     log_info(
       "  {%.3f, %.3f, %.3f} ... {%.3f, %.3f, %.3f}\n",
       particles[0].x, particles[0].y, particles[0].z,
-      particles[999].x, particles[999].y, particles[999].z
+      particles[VERTEX_COUNT - 1].x, particles[VERTEX_COUNT - 1].y, particles[VERTEX_COUNT - 1].z
     );
   }
 
@@ -275,7 +276,7 @@ void render_ui(void) {
   {
     SDL_BindGPUGraphicsPipeline(pass, pipeline);
     SDL_BindGPUVertexBuffers(pass, 0, &vertex_binding, 1);
-    SDL_DrawGPUPrimitives(pass, 1000, 1, 0, 0);
+    SDL_DrawGPUPrimitives(pass, VERTEX_COUNT, 1, 0, 0);
   }
   SDL_EndGPURenderPass(pass);
   SDL_SubmitGPUCommandBuffer(buf);
