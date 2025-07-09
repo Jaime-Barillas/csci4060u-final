@@ -4,19 +4,26 @@ use "lib:ui" if not windows
 use "lib:libui" if windows
 
 use "actor_pinning"
+use "files"
 use "log"
 use "runtime_info"
 
-use @create_ui[None]()
+use @create_ui[U8](exe_path: Pointer[U8] tag)
 use @destroy_ui[None]()
 use @update_ui[U8]()
 use @render_ui[None]()
 
 actor Main
+  let _exe_path: String
   let _log: Logger
   let _pin_auth: PinUnpinActorAuth
 
   new create(env: Env) =>
+    _exe_path = try
+      Path.dir(env.args(0)?)
+    else "."
+    end
+
     let log_target = ConsoleTarget(env.out)
     _log = Logger("Main", log_target)
     _pin_auth = PinUnpinActorAuth(env.root)
@@ -36,9 +43,9 @@ actor Main
     end
 
   be setup_and_run() =>
-    @create_ui()
-
-    run()
+    if @create_ui(_exe_path.cstring()) == 1 then
+      run()
+    end
 
   be run() =>
     let running = @update_ui()

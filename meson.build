@@ -97,3 +97,8 @@ final_pony = custom_target(proj,
     '@SOURCE_ROOT@' / proj,
   ],
 )
+
+###########
+# Shaders #
+###########
+subdir('shaders')
