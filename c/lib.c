@@ -28,6 +28,13 @@ const float screen_quad[SCREEN_QUAD_VERTEX_COUNT * 3] = {
   -1.0f, -1.0f, 0.0f,
 };
 
+struct Uniforms {
+  unsigned int width;
+  unsigned int height;
+  int sphere_count;
+  float sphere_radius;
+} uniforms;
+
 /* UI State */
 int width = 0;
 int height = 0;
@@ -38,15 +45,16 @@ struct Particle {
   float x;
   float y;
   float z;
+  float _padding;
 };
 
-SDL_GPUBuffer * upload_buffer(SDL_GPUBufferUsageFlags, const void *data, int data_count);
-SDL_GPUShader * load_shader(const char *, SDL_GPUShaderStage);
+SDL_GPUBuffer * upload_buffer(SDL_GPUBufferUsageFlags, const void *, int);
+SDL_GPUShader * load_shader(const char *, SDL_GPUShaderStage, unsigned int, unsigned int);
 SDL_GPUGraphicsPipeline * create_pipeline(const char *);
 
 
 /* Temporary Code */
-#define VERTEX_COUNT (6 * 500)
+#define VERTEX_COUNT (200)
 struct Particle particles[VERTEX_COUNT];
 void generate_particles(void) {
   for (int i = 0; i < VERTEX_COUNT; i++) {
@@ -179,16 +187,23 @@ char update_ui(void) {
 }
 
 void render_ui(void) {
-  SDL_GPUCommandBuffer *buf;
+  SDL_GPUCommandBuffer *render_cmds;
   SDL_GPUTexture *tex;
-  unsigned int tex_width;
-  unsigned int tex_height;
   bool res;
 
-  buf = SDL_AcquireGPUCommandBuffer(device);
-  res = SDL_WaitAndAcquireGPUSwapchainTexture(buf, window, &tex, &tex_width, &tex_height);
+  uniforms.sphere_count = VERTEX_COUNT;
+  uniforms.sphere_radius = 0.05f;
+
+  render_cmds = SDL_AcquireGPUCommandBuffer(device);
+  res = SDL_WaitAndAcquireGPUSwapchainTexture(
+    render_cmds,
+    window,
+    &tex,
+    &(uniforms.width),
+    &(uniforms.height)
+  );
   if (!res) {
-    SDL_CancelGPUCommandBuffer(buf);
+    SDL_CancelGPUCommandBuffer(render_cmds);
     return;
   }
 
@@ -204,14 +219,16 @@ void render_ui(void) {
     .offset = 0
   };
 
-  SDL_GPURenderPass *pass = SDL_BeginGPURenderPass(buf, &cti, 1, NULL);
+  SDL_GPURenderPass *pass = SDL_BeginGPURenderPass(render_cmds, &cti, 1, NULL);
   {
     SDL_BindGPUGraphicsPipeline(pass, pipeline);
     SDL_BindGPUVertexBuffers(pass, 0, &screen_quad_binding, 1);
+    SDL_BindGPUFragmentStorageBuffers(pass, 0, &storage_buffer, 1);
+    SDL_PushGPUFragmentUniformData(render_cmds, 0, &uniforms, sizeof(uniforms));
     SDL_DrawGPUPrimitives(pass, SCREEN_QUAD_VERTEX_COUNT, 1, 0, 0);
   }
   SDL_EndGPURenderPass(pass);
-  SDL_SubmitGPUCommandBuffer(buf);
+  SDL_SubmitGPUCommandBuffer(render_cmds);
 }
 
 void destroy_ui(void) {
@@ -307,7 +324,10 @@ SDL_GPUBuffer * upload_buffer(SDL_GPUBufferUsageFlags buffer_usage, const void *
   return buffer;
 }
 
-SDL_GPUShader * load_shader(const char *path, SDL_GPUShaderStage stage) {
+SDL_GPUShader * load_shader(const char *path,
+                            SDL_GPUShaderStage stage,
+                            unsigned int num_uniform_buffers,
+                            unsigned int num_storage_buffers) {
   SDL_GPUShader *shader = NULL;
 
   size_t code_size;
@@ -325,8 +345,8 @@ SDL_GPUShader * load_shader(const char *path, SDL_GPUShaderStage stage) {
     .stage = stage,
     .num_samplers = 0,
     .num_storage_textures = 0,
-    .num_storage_buffers = 0,
-    .num_uniform_buffers = 0,
+    .num_storage_buffers = num_storage_buffers,
+    .num_uniform_buffers = num_uniform_buffers,
     .props = 0
   };
 
@@ -343,7 +363,7 @@ SDL_GPUGraphicsPipeline * create_pipeline(const char *exe_path) {
 
   SDL_zero(path_buf);
   snprintf(path_buf, 256, "%s/shaders/vertex.spv", exe_path);
-  SDL_GPUShader *vertex_shader = load_shader(path_buf, SDL_GPU_SHADERSTAGE_VERTEX);
+  SDL_GPUShader *vertex_shader = load_shader(path_buf, SDL_GPU_SHADERSTAGE_VERTEX, 0, 0);
   if (!vertex_shader) {
     log_err("Failed to create vertex shader!\n");
     goto fail_vertex;
@@ -351,7 +371,7 @@ SDL_GPUGraphicsPipeline * create_pipeline(const char *exe_path) {
 
   SDL_zero(path_buf);
   snprintf(path_buf, 256, "%s/shaders/fragment.spv", exe_path);
-  SDL_GPUShader *fragment_shader = load_shader(path_buf, SDL_GPU_SHADERSTAGE_FRAGMENT);
+  SDL_GPUShader *fragment_shader = load_shader(path_buf, SDL_GPU_SHADERSTAGE_FRAGMENT, 1, 1);
   if (!fragment_shader) {
     log_err("Failed to create fragment shader!\n");
     goto fail_fragment;
@@ -360,7 +380,7 @@ SDL_GPUGraphicsPipeline * create_pipeline(const char *exe_path) {
 
   SDL_GPUVertexBufferDescription vbuf_desc = {
     .slot = 0,
-    .pitch = sizeof(struct Particle),
+    .pitch = sizeof(screen_quad) / SCREEN_QUAD_VERTEX_COUNT,
     .input_rate = SDL_GPU_VERTEXINPUTRATE_VERTEX,
     .instance_step_rate = 0
   };
