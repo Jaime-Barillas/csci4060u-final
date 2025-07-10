@@ -11,11 +11,25 @@
 #include <string.h>
 
 
+struct SDLBufferPair {
+  SDL_GPUBuffer *buf;
+  SDL_GPUTransferBuffer *tbuf;
+  SDL_GPUBufferUsageFlags usage;
+};
+
 SDL_Window *window = NULL;
 SDL_GPUDevice *device = NULL;
 SDL_GPUGraphicsPipeline *pipeline = NULL;
-SDL_GPUBuffer *vertex_buffer = NULL;
-SDL_GPUBuffer *storage_buffer = NULL;
+struct SDLBufferPair vertex_buffer = {
+  .buf = NULL,
+  .tbuf = NULL,
+  .usage = SDL_GPU_BUFFERUSAGE_VERTEX
+};
+struct SDLBufferPair storage_buffer = {
+  .buf = NULL,
+  .tbuf = NULL,
+  .usage = SDL_GPU_BUFFERUSAGE_GRAPHICS_STORAGE_READ
+};
 
 #define SCREEN_QUAD_VERTEX_COUNT (6)
 const float screen_quad[SCREEN_QUAD_VERTEX_COUNT * 3] = {
@@ -48,9 +62,18 @@ struct Particle {
   float _padding;
 };
 
-SDL_GPUBuffer * upload_buffer(SDL_GPUBufferUsageFlags, const void *, int);
-SDL_GPUShader * load_shader(const char *, SDL_GPUShaderStage, unsigned int, unsigned int);
-SDL_GPUGraphicsPipeline * create_pipeline(const char *);
+bool upload_to_buffer(
+  struct SDLBufferPair *bufs,
+  const void *data,
+  int data_size,
+  bool cycle
+);
+SDL_GPUShader * load_shader(
+  const char *path,
+  SDL_GPUShaderStage stage,
+  unsigned int num_uniform_buffers,
+  unsigned int num_storage_buffers);
+SDL_GPUGraphicsPipeline * create_pipeline(const char *exe_path);
 
 
 /* Temporary Code */
@@ -148,9 +171,9 @@ char create_ui(const char *exe_path) {
 
   /* Temporary Code */
   generate_particles();
-  vertex_buffer = upload_buffer(SDL_GPU_BUFFERUSAGE_VERTEX, screen_quad, sizeof(screen_quad));
-  storage_buffer = upload_buffer(SDL_GPU_BUFFERUSAGE_GRAPHICS_STORAGE_READ, particles, sizeof(particles));
-  if (!vertex_buffer || !storage_buffer) {
+  bool res1 = upload_to_buffer(&vertex_buffer, screen_quad, sizeof(screen_quad), false);
+  bool res2 = upload_to_buffer(&storage_buffer, particles, sizeof(particles), false);
+  if (!res1 || !res2) {
     goto fail_claim;
   }
 
@@ -191,6 +214,14 @@ void render_ui(void) {
   SDL_GPUTexture *tex;
   bool res;
 
+  for (int i = 0; i < VERTEX_COUNT; i++) {
+    particles[i].x += 0.01;
+  }
+
+  if (!upload_to_buffer(&storage_buffer, particles, sizeof(particles), true)) {
+    log_warn("Failed to upload updated particles!\n");
+  }
+
   uniforms.sphere_count = VERTEX_COUNT;
   uniforms.sphere_radius = 0.05f;
 
@@ -215,7 +246,7 @@ void render_ui(void) {
   };
 
   SDL_GPUBufferBinding screen_quad_binding = {
-    .buffer = vertex_buffer,
+    .buffer = vertex_buffer.buf,
     .offset = 0
   };
 
@@ -223,7 +254,7 @@ void render_ui(void) {
   {
     SDL_BindGPUGraphicsPipeline(pass, pipeline);
     SDL_BindGPUVertexBuffers(pass, 0, &screen_quad_binding, 1);
-    SDL_BindGPUFragmentStorageBuffers(pass, 0, &storage_buffer, 1);
+    SDL_BindGPUFragmentStorageBuffers(pass, 0, &storage_buffer.buf, 1);
     SDL_PushGPUFragmentUniformData(render_cmds, 0, &uniforms, sizeof(uniforms));
     SDL_DrawGPUPrimitives(pass, SCREEN_QUAD_VERTEX_COUNT, 1, 0, 0);
   }
@@ -233,8 +264,10 @@ void render_ui(void) {
 
 void destroy_ui(void) {
   SDL_ReleaseGPUGraphicsPipeline(device, pipeline);
-  SDL_ReleaseGPUBuffer(device, storage_buffer);
-  SDL_ReleaseGPUBuffer(device, vertex_buffer);
+  SDL_ReleaseGPUBuffer(device, storage_buffer.buf);
+  SDL_ReleaseGPUBuffer(device, vertex_buffer.buf);
+  SDL_ReleaseGPUTransferBuffer(device, storage_buffer.tbuf);
+  SDL_ReleaseGPUTransferBuffer(device, vertex_buffer.tbuf);
   SDL_ReleaseWindowFromGPUDevice(device, window);
   SDL_DestroyGPUDevice(device);
   SDL_DestroyWindow(window);
@@ -246,65 +279,70 @@ void destroy_ui(void) {
 /* Internal Functions */
 /**********************/
 
-SDL_GPUBuffer * upload_buffer(SDL_GPUBufferUsageFlags buffer_usage, const void *data, int data_size) {
-  SDL_GPUBuffer *buffer = NULL;
-  SDL_GPUTransferBuffer *transfer_buffer;
-
-
+bool upload_to_buffer(
+  struct SDLBufferPair *bufs,
+  const void *data,
+  int data_size,
+  bool cycle
+) {
   // 1. Allocate necessary buffers.
-  SDL_GPUTransferBufferCreateInfo transfer_info = {
-    .usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD,
-    .size = data_size,
-    .props = 0
-  };
+  if (!bufs->tbuf) {
+    SDL_GPUTransferBufferCreateInfo transfer_info = {
+      .usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD,
+      .size = data_size,
+      .props = 0
+    };
 
-  transfer_buffer = SDL_CreateGPUTransferBuffer(device, &transfer_info);
-  if (!transfer_buffer) {
-    log_err("Failed to allocate GPU transfer buffer!\n");
-    goto cleanup;
+    bufs->tbuf = SDL_CreateGPUTransferBuffer(device, &transfer_info);
+    if (!bufs->tbuf) {
+      log_err("Failed to allocate GPU transfer buffer!\n");
+      goto ERROR_CLEANUP;
+    }
   }
 
-  SDL_GPUBufferCreateInfo buf_info = {
-    .usage = buffer_usage,
-    .size = data_size,
-    .props = 0
-  };
+  if (!bufs->buf) {
+    SDL_GPUBufferCreateInfo buf_info = {
+      .usage = bufs->usage,
+      .size = data_size,
+      .props = 0
+    };
 
-  buffer = SDL_CreateGPUBuffer(device, &buf_info);
-  if (!buffer) {
-    log_err("Failed to allocate GPU buffer!\n");
-    goto cleanup;
+    bufs->buf = SDL_CreateGPUBuffer(device, &buf_info);
+    if (!bufs->buf) {
+      log_err("Failed to allocate GPU buffer!\n");
+      goto ERROR_CLEANUP;
+    }
   }
 
 
   // 2. Copy data to GPU transfer buffer.
-  SDL_GPUTransferBufferLocation source = {
-    .transfer_buffer = transfer_buffer,
-    .offset = 0
-  };
-
-  SDL_GPUBufferRegion destination = {
-    .buffer = buffer,
-    .offset = 0,
-    .size = data_size
-  };
-
-  void *mapping = SDL_MapGPUTransferBuffer(device, transfer_buffer, true);
+  void *mapping = SDL_MapGPUTransferBuffer(device, bufs->tbuf, cycle);
   if (!mapping) {
     log_err("Failed to map transfer buffer!\n");
-    goto cleanup_buffer;
+    goto ERROR;
   }
 
   SDL_memcpy(mapping, data, data_size);
 
-  SDL_UnmapGPUTransferBuffer(device, transfer_buffer);
+  SDL_UnmapGPUTransferBuffer(device, bufs->tbuf);
 
 
   // 3. Record and submit copy pass.
+  SDL_GPUTransferBufferLocation source = {
+    .transfer_buffer = bufs->tbuf,
+    .offset = 0
+  };
+
+  SDL_GPUBufferRegion destination = {
+    .buffer = bufs->buf,
+    .offset = 0,
+    .size = data_size
+  };
+
   SDL_GPUCommandBuffer *copy_cmds = SDL_AcquireGPUCommandBuffer(device);
   if (!copy_cmds) {
     log_err("Failed to acquire a GPU command buffer to upload particles!\n");
-    goto cleanup_buffer;
+    goto ERROR;
   }
 
   SDL_GPUCopyPass *pass = SDL_BeginGPUCopyPass(copy_cmds);
@@ -313,15 +351,14 @@ SDL_GPUBuffer * upload_buffer(SDL_GPUBufferUsageFlags buffer_usage, const void *
 
   SDL_SubmitGPUCommandBuffer(copy_cmds);
 
-  cleanup:
-  if (transfer_buffer) { SDL_ReleaseGPUTransferBuffer(device, transfer_buffer); }
-  return buffer;
+  return true;
 
-  cleanup_buffer:
-  SDL_ReleaseGPUTransferBuffer(device, transfer_buffer);
-  SDL_ReleaseGPUBuffer(device, buffer);
-  buffer = NULL;
-  return buffer;
+  ERROR_CLEANUP:
+  if (bufs->buf) { SDL_ReleaseGPUBuffer(device, bufs->buf); }
+  if (bufs->tbuf) { SDL_ReleaseGPUTransferBuffer(device, bufs->tbuf); }
+
+  ERROR:
+  return false;
 }
 
 SDL_GPUShader * load_shader(const char *path,
