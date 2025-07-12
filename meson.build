@@ -64,6 +64,8 @@ libui_path = fs.parent(libui.full_path())
 # determine when to recompile.
 pony_sources = files(
   proj / 'main.pony',
+  proj / 'pm.pony',
+  proj / 'particle.pony',
   proj / 'log' / 'log.pony',
 )
 pony_output = windows ? proj + '.exe' : proj

@@ -11,14 +11,19 @@ use "runtime_info"
 use @create_ui[U8](exe_path: Pointer[U8] tag)
 use @destroy_ui[None]()
 use @update_ui[U8]()
-use @render_ui[None]()
+use @render_ui[None](particles: Pointer[Particle ref] tag)
 
 actor Main
   let _exe_path: String
   let _log: Logger
   let _pin_auth: PinUnpinActorAuth
+  let _pm: PM
 
   new create(env: Env) =>
+    _pm = PM(this)
+
+    // The C code will need to know the path to the exe to load shaders in the
+    // sibling "shader" folder.
     _exe_path = try
       Path.dir(env.args(0)?)
     else "."
@@ -44,18 +49,21 @@ actor Main
 
   be setup_and_run() =>
     if @create_ui(_exe_path.cstring()) == 1 then
-      run()
+      update()
     end
 
-  be run() =>
+  be update() =>
     let running = @update_ui()
-    @render_ui()
 
     if running == 1 then
-      run()
+      _pm.update()
     else
       cleanup()
     end
+
+  be draw(particles: Pointer[Particle ref] tag) =>
+    @render_ui(particles)
+    update()
 
   be cleanup() =>
     @destroy_ui()
