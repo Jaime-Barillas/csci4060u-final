@@ -1,0 +1,20 @@
+add_library(
+  ui
+  STATIC
+  ui.c
+)
+target_include_directories(
+  ui
+  INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}
+)
+target_link_libraries(
+  ui
+  PUBLIC
+    SDL3_ttf::SDL3_ttf
+    SDL3::SDL3
+)
+target_compile_definitions(
+  ui
+  PRIVATE
+    "$<$<CONFIG:Debug>:LogEnabled=1>"
+)

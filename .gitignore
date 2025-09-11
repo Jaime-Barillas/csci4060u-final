@@ -1,13 +1,9 @@
 .clangd
 .lsp/
 .clj-kondo/
+# clangd stuff.
+.cache/
 
-subprojects/**
-!subprojects/*.wrap
-!subprojects/
-!subprojects/packagefiles/*/meson.build
-!subprojects/packagefiles/
-!subprojects/packagefiles/*
-
+build/
 install/
 

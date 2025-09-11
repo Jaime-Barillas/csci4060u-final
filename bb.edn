@@ -3,47 +3,69 @@
              [babashka.process :as proc]
              [babashka.cli :as cli])
 
-  :init (def opts
-          (cli/parse-opts
+  :init (def args
+          (cli/parse-args
             *command-line-args*
-            {:spec {:release {:coerce :boolean}}}))
+            {:spec {:release {:coerce :boolean}
+                    :submodules {:coerce :boolean}
+                    :verbose {:coerce :boolean
+                              :alias :v}}}))
 
-  -build-type (if (:release opts) "release" "debug")
+  -build-path (fs/path "build" (if (-> args :opts :release) "release" "debug"))
+  -cmake-build-type (if (-> args :opts :release) "Release" "Debug")
 
   setup
-  {:doc "Run project setup (args: --release)"
-   :depends [-build-type]
-   :task (let [build-path (fs/path "build" -build-type)]
-           (try
-             (proc/shell "meson" "setup" build-path)
-             (when (= -build-type "release")
-               (proc/shell
-                 "meson" "configure" build-path "-Dbuildtype=release"))
-             (catch Exception ex
-               (println (ex-message ex))
-               (System/exit 1))))}
+  {:doc "Run project setup (opts: --release --submodules)"
+   :depends [-build-path -cmake-build-type]
+   :task (try
+           (when (-> args :opts :submodules)
+             (proc/shell "git" "submodule" "update" "--init" "--recursive")
+             (proc/shell {:dir "subprojects/sdl3_ttf/external"}
+               (if (fs/windows?)
+                 "Get-GitModules.ps1"
+                 "download.sh")))
+           (proc/shell "cmake"
+             "-S" "."
+             "-B" -build-path
+             (str "-DCMAKE_BUILD_TYPE=" -cmake-build-type))
+           (catch Exception ex
+             (println (ex-message ex))
+             (System/exit 1)))}
 
   build
-  {:doc "Compile the program (args: --release)"
-   :depends [-build-type]
-   :task (if (seq (fs/modified-since
-                    (fs/file "build" -build-type "fluid-sim-sph")
-                    "fluid-sim-sph"))
-           (try
-             (proc/shell
-               "meson" "compile" "-C" (fs/path "./build" -build-type))
-             (catch Exception ex
-               (println (ex-message ex))
-               (System/exit 1))))}
+  {:doc "Compile the program (opts: --release -v,--verbose)"
+   :depends [-build-path]
+   :task (try
+           (let [cmd (if (-> args :opts :verbose)
+                       ["cmake" "--build" -build-path "--verbose"]
+                       ["cmake" "--build" -build-path])]
+             (apply proc/shell cmd))
+           (catch Exception ex
+             (println (ex-message ex))
+             (System/exit 1)))}
 
   exe
-  {:doc "Run the program (args: --release)"
-   :depends [-build-type build]
-   :task (try
-           (proc/shell
-             (fs/path "build" -build-type "fluid-sim-sph"))
-             (catch Exception ex
-               (println (ex-message ex))
-               (System/exit 1)))}
+  {:doc "Run the program (args: <prog-name>, opts: --release)"
+   :depends [-build-path]
+   :task (let [prog (first (:args args))]
+           (when (nil? prog)
+             (println "Available programs:")
+             (some->>
+               (fs/list-dir -build-path)
+               (filter (every-pred fs/executable? fs/regular-file?))
+               (map fs/file-name)
+               (run! println))
+             (System/exit 0))
 
+           ;; NOTE: Dynamic dependency on build task.
+           (run 'build)
+
+           (let [prog-path (fs/path -build-path prog)]
+             (if (fs/exists? prog-path)
+               (-> (proc/shell {:continue true} prog-path)
+                 :exit
+                 (System/exit))
+               (do
+                 (println "Program" (str prog-path) "not found")
+                 (System/exit 1)))))}
   ,}}
