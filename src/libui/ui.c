@@ -6,9 +6,8 @@
 #include <SDL3/SDL_stdinc.h>
 #include <SDL3/SDL_video.h>
 #include <SDL3/SDL_gpu.h>
-#include <stdarg.h>
 #include <stdio.h>
-#include <string.h>
+#include "log.h"
 
 
 struct SDLBufferPair {
@@ -96,45 +95,6 @@ SDL_GPUShader * load_shader(
   unsigned int num_storage_buffers);
 SDL_GPUGraphicsPipeline * create_pipeline(const char *exe_path);
 
-
-void log_info(char * msg, ...) {
-  #ifdef LogEnabled
-  static char fmt[256];
-  int msg_len = 256 - 27 - strlen(msg);
-  va_list args;
-  va_start(args, msg);
-  strncpy(fmt, "\x1b[1m[C]\x1b[0m \x1b[96mInfo\x1b[0m: ", 27);
-  strncpy(&(fmt[27]), msg, msg_len > 0 ? msg_len : 0);
-  vprintf(fmt, args);
-  va_end(args);
-  #endif
-}
-
-void log_warn(char * msg, ...) {
-  #ifdef LogEnabled
-  static char fmt[256];
-  int msg_len = 256 - 27 - strlen(msg);
-  va_list args;
-  va_start(args, msg);
-  strncpy(fmt, "\x1b[1m[C]\x1b[0m \x1b[96mWarn\x1b[0m: ", 27);
-  strncpy(&(fmt[27]), msg, msg_len > 0 ? msg_len : 0);
-  vprintf(fmt, args);
-  va_end(args);
-  #endif
-}
-
-void log_err(char * msg, ...) {
-  #ifdef LogEnabled
-  static char fmt[256];
-  int msg_len = 256 - 28 - strlen(msg);
-  va_list args;
-  va_start(args, msg);
-  strncpy(fmt, "\x1b[1m[C]\x1b[0m \x1b[96mError\x1b[0m: ", 28);
-  strncpy(&(fmt[28]), msg, msg_len > 0 ? msg_len : 0);
-  vprintf(fmt, args);
-  va_end(args);
-  #endif
-}
 
 char create_ui(const char *exe_path) {
   if (!SDL_Init(SDL_INIT_VIDEO)) {

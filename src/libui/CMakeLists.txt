@@ -1,7 +1,13 @@
+set(
+  UI_SRCS
+    "${CMAKE_CURRENT_SOURCE_DIR}/ui.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/log.c"
+)
+
 add_library(
   ui
   STATIC
-  ui.c
+  ${UI_SRCS}
 )
 target_include_directories(
   ui

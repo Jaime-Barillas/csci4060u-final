@@ -1,1 +1,1 @@
-void message();
+#pragma once
