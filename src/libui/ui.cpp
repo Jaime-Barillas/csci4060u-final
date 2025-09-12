@@ -1,3 +1,4 @@
+#include "ui.h"
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_error.h>
 #include <SDL3/SDL_events.h>
@@ -48,21 +49,9 @@ struct Uniforms {
   float sphere_radius;
 } uniforms;
 
-struct Vec3 {
-  float x;
-  float y;
-  float z;
-};
-
 #define PARTICLE_COUNT 1000
 // NOTE: std430 requires 16-byte alignment for vec3 so we pad the size calculation.
 #define PARTICLE_BUFFER_SIZE ((sizeof(struct Vec3) + sizeof(float)) * PARTICLE_COUNT)
-struct Particle {
-  struct Vec3 pos;
-  struct Vec3 vel;
-  float density;
-  float pressure;
-};
 
 /* UI State */
 int width = 0;

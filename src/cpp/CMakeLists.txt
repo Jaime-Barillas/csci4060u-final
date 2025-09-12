@@ -1,41 +1,44 @@
 set(
-  C_SRCS
+  CPP_SRCS
   "${CMAKE_CURRENT_SOURCE_DIR}/main.cpp"
+  "${CMAKE_CURRENT_SOURCE_DIR}/particles.cpp"
 )
 
 # Sequential C program
 add_executable(
-  sph-c
-  ${C_SRCS}
+  sph-cpp
+  ${CPP_SRCS}
 )
 target_link_libraries(
-  sph-c
+  sph-cpp
   PUBLIC
     ui
 )
 set_target_properties(
-  sph-c
+  sph-cpp
   PROPERTIES
     BUILD_RPATH "$ORIGIN"
     INSTALL_RPATH "$ORIGIN"
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}
 )
 
 # Parallel C program
 # TODO
 find_package(Threads REQUIRED)
 add_executable(
-  sph-c-par
-  ${C_SRCS}
+  sph-cpp-par
+  ${CPP_SRCS}
 )
 target_link_libraries(
-  sph-c-par
+  sph-cpp-par
   PUBLIC
     Threads::Threads
     ui
 )
 set_target_properties(
-  sph-c-par
+  sph-cpp-par
   PROPERTIES
     BUILD_RPATH "$ORIGIN"
     INSTALL_RPATH "$ORIGIN"
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}
 )
