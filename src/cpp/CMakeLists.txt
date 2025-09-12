@@ -1,6 +1,6 @@
 set(
   C_SRCS
-  "${CMAKE_CURRENT_SOURCE_DIR}/main.c"
+  "${CMAKE_CURRENT_SOURCE_DIR}/main.cpp"
 )
 
 # Sequential C program

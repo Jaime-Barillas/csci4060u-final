@@ -1,17 +1,14 @@
 set(
   UI_SRCS
-    "${CMAKE_CURRENT_SOURCE_DIR}/ui.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/log.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/ui.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/log.cpp"
 )
 
-add_library(
-  ui
-  STATIC
-  ${UI_SRCS}
-)
+add_library(ui STATIC ${UI_SRCS})
 target_include_directories(
   ui
-  INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}
+  INTERFACE
+    "${CMAKE_CURRENT_SOURCE_DIR}"
 )
 target_link_libraries(
   ui

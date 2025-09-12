@@ -96,6 +96,7 @@ SDL_GPUShader * load_shader(
 SDL_GPUGraphicsPipeline * create_pipeline(const char *exe_path);
 
 
+extern "C" {
 char create_ui(const char *exe_path) {
   if (!SDL_Init(SDL_INIT_VIDEO)) {
     log_err("Failed to initialize SDL!\n");
@@ -245,6 +246,7 @@ void destroy_ui(void) {
   SDL_DestroyWindow(window);
   SDL_Quit();
 }
+}
 
 
 /**********************/
@@ -255,7 +257,7 @@ bool allocate_buffers(struct SDLBufferPair *bufs, int data_size) {
   if (!bufs->tbuf) {
     SDL_GPUTransferBufferCreateInfo transfer_info = {
       .usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD,
-      .size = data_size,
+      .size = (uint32_t)data_size,
       .props = 0
     };
 
@@ -269,7 +271,7 @@ bool allocate_buffers(struct SDLBufferPair *bufs, int data_size) {
   if (!bufs->buf) {
     SDL_GPUBufferCreateInfo buf_info = {
       .usage = bufs->usage,
-      .size = data_size,
+      .size = (uint32_t)data_size,
       .props = 0
     };
 
@@ -308,7 +310,7 @@ bool transfer_particle_data(
   int data_count,
   bool cycle
 ) {
-  float *mapping = SDL_MapGPUTransferBuffer(device, bufs->tbuf, cycle);
+  float *mapping = (float*)SDL_MapGPUTransferBuffer(device, bufs->tbuf, cycle);
   if (!mapping) {
     log_err("Failed to map transfer buffer!\n");
     return false;
@@ -348,7 +350,7 @@ bool upload_to_gpu(
   SDL_GPUBufferRegion destination = {
     .buffer = bufs->buf,
     .offset = 0,
-    .size = data_size
+    .size = (uint32_t)data_size
   };
 
   SDL_GPUCopyPass *pass = SDL_BeginGPUCopyPass(copy_cmds);
@@ -374,8 +376,8 @@ SDL_GPUShader * load_shader(const char *path,
   }
 
   SDL_GPUShaderCreateInfo shader_info = {
-    .code = code,
     .code_size = code_size,
+    .code = (uint8_t*)code,
     .entrypoint = "main",
     .format = SDL_GPU_SHADERFORMAT_SPIRV,
     .stage = stage,
@@ -402,7 +404,7 @@ SDL_GPUGraphicsPipeline * create_pipeline(const char *exe_path) {
   SDL_GPUShader *vertex_shader = load_shader(path_buf, SDL_GPU_SHADERSTAGE_VERTEX, 0, 0);
   if (!vertex_shader) {
     log_err("Failed to create vertex shader!\n");
-    goto fail_vertex;
+    return graphics_pipeline;
   }
 
   SDL_zero(path_buf);
@@ -410,7 +412,8 @@ SDL_GPUGraphicsPipeline * create_pipeline(const char *exe_path) {
   SDL_GPUShader *fragment_shader = load_shader(path_buf, SDL_GPU_SHADERSTAGE_FRAGMENT, 1, 1);
   if (!fragment_shader) {
     log_err("Failed to create fragment shader!\n");
-    goto fail_fragment;
+    SDL_ReleaseGPUShader(device, vertex_shader);
+    return graphics_pipeline;
   }
 
 
@@ -422,10 +425,10 @@ SDL_GPUGraphicsPipeline * create_pipeline(const char *exe_path) {
   };
 
   SDL_GPUVertexAttribute vbuf_attr = {
-    .buffer_slot = 0,
     .location = 0,
+    .buffer_slot = 0,
+    .format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3,
     .offset = 0,
-    .format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3
   };
 
   SDL_GPUColorTargetDescription pipeline_ctd = {
@@ -435,16 +438,16 @@ SDL_GPUGraphicsPipeline * create_pipeline(const char *exe_path) {
   SDL_GPUGraphicsPipelineCreateInfo pipeline_info = {
     .vertex_shader = vertex_shader,
     .fragment_shader = fragment_shader,
-    .primitive_type = SDL_GPU_PRIMITIVETYPE_TRIANGLELIST,
     .vertex_input_state = {
-      .num_vertex_buffers = 1,
       .vertex_buffer_descriptions = &vbuf_desc,
+      .num_vertex_buffers = 1,
+      .vertex_attributes = &vbuf_attr,
       .num_vertex_attributes = 1,
-      .vertex_attributes = &vbuf_attr
     },
+    .primitive_type = SDL_GPU_PRIMITIVETYPE_TRIANGLELIST,
     .target_info = {
-      .num_color_targets = 1,
       .color_target_descriptions = &pipeline_ctd,
+      .num_color_targets = 1,
     }
   };
 

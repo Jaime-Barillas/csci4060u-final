@@ -3,7 +3,7 @@
 #include <string.h>
 #include <stdio.h>
 
-void log_info(char * fmt, ...) {
+void log_info(const char * fmt, ...) {
   #ifdef LogEnabled
   static char buf[256];
   int fmt_len = 256 - 27 - strlen(fmt);
@@ -16,7 +16,7 @@ void log_info(char * fmt, ...) {
   #endif
 }
 
-void log_warn(char * fmt, ...) {
+void log_warn(const char * fmt, ...) {
   #ifdef LogEnabled
   static char buf[256];
   int fmt_len = 256 - 27 - strlen(fmt);
@@ -29,7 +29,7 @@ void log_warn(char * fmt, ...) {
   #endif
 }
 
-void log_err(char * fmt, ...) {
+void log_err(const char * fmt, ...) {
   #ifdef LogEnabled
   static char buf[256];
   int fmt_len = 256 - 28 - strlen(fmt);
