@@ -1,11 +1,13 @@
 #include "particles.h"
 #include <cmath>
 #include <cstdint>
+#include <numbers>
 #include <ranges>
 #include <ui.h>
+#include "util.h"
 #include <vector>
 
-namespace Particles {
+namespace particles {
   void reset(
     std::vector<Particle> &particles,
     uint32_t count,
@@ -28,5 +30,26 @@ namespace Particles {
       };
       particles[i].vel = {.x = 0, .y = 0, .z = 0};
     }
+  }
+
+  template<>
+  float kernel<PolyKernel>(Vec3 &point, Vec3 &particle) {
+    static constexpr float COEFFICIENT = 315.0f / (64 * std::numbers::pi_v<float> * util::pow(particles::SUPPORT, 9));
+
+    float dx = particle.x - point.x;
+    float dy = particle.y - point.y;
+    float dz = particle.z - point.z;
+    float distsqr = (dx * dx) + (dy * dy) + (dz * dz);
+    float q = (particles::SUPPORT * particles::SUPPORT) - distsqr;
+
+    // Check if within SUPPORT radius.
+    q = (q < 0) ? 0 : q;
+    return (q * q * q * COEFFICIENT);
+  }
+
+  template<>
+  float kernel<SpikyKernel>(Vec3 &point, Vec3 &particle) {
+    // TODO:
+    return 2;
   }
 }
