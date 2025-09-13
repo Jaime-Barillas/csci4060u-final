@@ -19,11 +19,7 @@
    :depends [-build-path -cmake-build-type]
    :task (try
            (when (-> args :opts :submodules)
-             (proc/shell "git" "submodule" "update" "--init" "--recursive")
-             (proc/shell {:dir "subprojects/sdl3_ttf/external"}
-               (if (fs/windows?)
-                 "Get-GitModules.ps1"
-                 "download.sh")))
+             (proc/shell "git" "submodule" "update" "--init" "--recursive"))
            (proc/shell "cmake"
              "-S" "."
              "-B" -build-path
