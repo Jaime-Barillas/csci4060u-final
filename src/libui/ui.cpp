@@ -9,6 +9,8 @@
 #include <SDL3/SDL_gpu.h>
 #include <stdio.h>
 #include "log.h"
+#include "sdl3.h"
+#include <expected>
 
 
 struct SDLBufferPair {
@@ -87,46 +89,15 @@ SDL_GPUGraphicsPipeline * create_pipeline(const char *exe_path);
 
 extern "C" {
 char create_ui(const char *exe_path) {
-  if (!SDL_Init(SDL_INIT_VIDEO)) {
-    log_err("Failed to initialize SDL!\n");
+  auto ctx = sdl3::make_window();
+  if (ctx) {
+    window = ctx->window;
+    device = ctx->device;
+    log_info("GPU device created...\n");
+  } else {
+    log_err("Failed to create window\n");
     goto fail_init;
   }
-
-  /* Create Window */
-  SDL_DisplayID display;
-  SDL_Rect bounds;
-
-  display = SDL_GetPrimaryDisplay();
-  if (display == 0) {
-    log_warn("Failed to get primary display handle! Using default window sizes.\n");
-    bounds.w = 720;
-    bounds.h = 720;
-  } else {
-    SDL_GetDisplayBounds(display, &bounds);
-  }
-
-  width = (bounds.w * 2) / 3;
-  height = (bounds.h * 2) / 3;
-  log_info("Window size: %dx%d\n", width, height);
-
-  window = SDL_CreateWindow("fluid-sim-sph", width, height, 0);
-  if (!window) {
-    log_err("Failed to create window!\n");
-    goto fail_window;
-  }
-
-  /* Create GPU Device */
-  device = SDL_CreateGPUDevice(SDL_GPU_SHADERFORMAT_SPIRV, false, NULL);
-  if (!device) {
-    log_err("Failed to create GPU device!\n");
-    goto fail_device;
-  }
-
-  if (!SDL_ClaimWindowForGPUDevice(device, window)) {
-    log_err("Failed to claim window for GPU!\n");
-    goto fail_claim;
-  }
-  log_info("GPU device created...\n");
 
 
   if (!allocate_buffers(&vertex_buffer, sizeof(screen_quad)) ||
@@ -172,6 +143,41 @@ char update_ui(void) {
 
   // TODO: Return new UI state.
   return run;
+}
+
+void render_ui2() {
+  SDL_GPUCommandBuffer *render_cmds;
+  SDL_GPUTexture *tex;
+  bool res;
+
+  render_cmds = SDL_AcquireGPUCommandBuffer(device);
+  res = SDL_WaitAndAcquireGPUSwapchainTexture(
+    render_cmds,
+    window,
+    &tex,
+    &(uniforms.width),
+    &(uniforms.height)
+  );
+  if (!res) {
+    SDL_CancelGPUCommandBuffer(render_cmds);
+    return;
+  }
+
+  SDL_GPUColorTargetInfo cti = {
+    .texture = tex,
+    .clear_color = { .r = 0.05, .g = 0.05, .b = 0.25 },
+    .load_op = SDL_GPU_LOADOP_CLEAR,
+    .store_op = SDL_GPU_STOREOP_STORE
+  };
+
+  SDL_GPUBufferBinding screen_quad_binding = {
+    .buffer = vertex_buffer.buf,
+    .offset = 0
+  };
+
+  SDL_GPURenderPass *pass = SDL_BeginGPURenderPass(render_cmds, &cti, 1, NULL);
+  SDL_EndGPURenderPass(pass);
+  SDL_SubmitGPUCommandBuffer(render_cmds);
 }
 
 void render_ui(const struct Particle *const *particles) {

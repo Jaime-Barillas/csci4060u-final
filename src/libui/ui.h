@@ -12,3 +12,11 @@ struct Particle {
   float density;
   float pressure;
 };
+
+extern "C" {
+  char create_ui(const char *exe_path);
+  char update_ui(void);
+  void render_ui(const struct Particle *const *particles);
+  void render_ui2();
+  void destroy_ui(void);
+}

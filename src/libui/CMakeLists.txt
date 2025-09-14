@@ -2,6 +2,7 @@ set(
   UI_SRCS
     "${CMAKE_CURRENT_SOURCE_DIR}/ui.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/log.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/sdl3.cpp"
 )
 
 add_library(ui STATIC ${UI_SRCS})
