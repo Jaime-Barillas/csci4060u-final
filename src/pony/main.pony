@@ -2,6 +2,8 @@ use "lib:SDL3" if not windows // Needed by the wrapper library
 use "lib:libSDL3" if windows // TODO: Test on Windows
 use "lib:ui" if not windows
 use "lib:libui" if windows
+use "lib:stdc++" if not windows
+use "lib:libstdc++" if windows // TODO: Test on Windows
 
 use "actor_pinning"
 use "files"
