@@ -48,7 +48,7 @@ namespace particles {
   }
 
   template<>
-  float kernel<SpikyKernel>(Vec3 &point, Vec3 &particle) {
+  float kernel<SpikyGradKernel>(Vec3 &point, Vec3 &particle) {
     // TODO:
     return 2;
   }
