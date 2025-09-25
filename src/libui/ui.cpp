@@ -456,3 +456,161 @@ SDL_GPUGraphicsPipeline * create_pipeline(const char *exe_path) {
   fail_vertex:
   return graphics_pipeline;
 }
+
+void test_compute(std::vector<Particle> ps) {
+  SDL_GPUTransferBuffer *ps_tb = nullptr;
+  SDL_GPUBuffer *ps_b = nullptr;
+  SDL_GPUBuffer *v_b = nullptr;
+  uint32_t std140_ps_size = (uint32_t)(sizeof(float) * 4 * ps.size());
+
+  allocate: {
+    SDL_GPUTransferBufferCreateInfo ps_tbi = {
+      .usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD,
+      .size = std140_ps_size,
+      .props = 0
+    };
+    SDL_GPUBufferCreateInfo ps_bi = {
+      .usage = SDL_GPU_BUFFERUSAGE_COMPUTE_STORAGE_READ,
+      .size = std140_ps_size,
+      .props = 0
+    };
+    SDL_GPUBufferCreateInfo v_bi = {
+      .usage = SDL_GPU_BUFFERUSAGE_COMPUTE_STORAGE_WRITE |
+               SDL_GPU_BUFFERUSAGE_VERTEX,
+      .size = std140_ps_size * 6, // triangle list
+      .props = 0,
+    };
+
+    ps_tb = SDL_CreateGPUTransferBuffer(device, &ps_tbi);
+    ps_b = SDL_CreateGPUBuffer(device, &ps_bi);
+    v_b = SDL_CreateGPUBuffer(device, &v_bi);
+    if (!ps_tb) { log_err("Failed to allocate transfer buffer\n"); log_info("%s\n", SDL_GetError()); return; }
+    if (!ps_b)  { log_err("Failed to allocate position buffer\n"); return; }
+    if (!v_b)   { log_err("Failed to allocate vertex buffer\n"); return; }
+  }
+
+  upload: {
+    float *mapping = (float*)SDL_MapGPUTransferBuffer(device, ps_tb, false);
+    if (!mapping) { log_err("Failed to map transfer buffer\n"); return; }
+    int32_t i = 0;
+    for (auto it = ps.begin(); it != ps.end(); it++) {
+      mapping[i + 0] = it->pos.x;
+      mapping[i + 1] = it->pos.y;
+      mapping[i + 2] = it->pos.z;
+      mapping[i + 3] = 0;
+      i += 4;
+    }
+    SDL_UnmapGPUTransferBuffer(device, ps_tb);
+
+    SDL_GPUTransferBufferLocation loc = {.transfer_buffer = ps_tb, .offset = 0};
+    SDL_GPUBufferRegion reg = {.buffer = ps_b, .offset = 0, .size = std140_ps_size};
+
+    SDL_GPUCommandBuffer *cmds = SDL_AcquireGPUCommandBuffer(device);
+    SDL_GPUCopyPass *pass = SDL_BeginGPUCopyPass(cmds);
+    SDL_UploadToGPUBuffer(pass, &loc, &reg, false);
+    SDL_EndGPUCopyPass(pass);
+    SDL_SubmitGPUCommandBuffer(cmds);
+  }
+
+  SDL_GPUComputePipeline *cp = nullptr;
+  SDL_GPUGraphicsPipeline *gp = nullptr;
+  pipline: {
+    size_t code_size;
+    void *code = SDL_LoadFile("build/debug/shaders/compute.spv", &code_size);
+    if (!code) { log_err("Failed to load compute shader\n"); return; }
+
+    SDL_GPUComputePipelineCreateInfo cp_i = {
+      .code_size = code_size,
+      .code = (uint8_t*)code,
+      .entrypoint = "main",
+      .format = SDL_GPU_SHADERFORMAT_SPIRV,
+      .num_samplers = 0,
+      .num_readonly_storage_textures = 0,
+      .num_readonly_storage_buffers = 1,
+      .num_readwrite_storage_textures = 0,
+      .num_readwrite_storage_buffers = 1,
+      .num_uniform_buffers = 0,
+      .threadcount_x = 1,
+      .threadcount_y = 1,
+      .threadcount_z = 1,
+      .props = 0,
+    };
+    cp = SDL_CreateGPUComputePipeline(device, &cp_i);
+    if (!cp) { log_err("Failed to create compute pipeline\n"); return; }
+
+    SDL_free(code);
+
+    size_t vert_size;
+    void *vert_code;
+    size_t frag_size;
+    void *frag_code;
+    vert_code = SDL_LoadFile("build/debug/shaders/vertex.spv", &vert_size);
+    frag_code = SDL_LoadFile("build/debug/shaders/frag.spv", &frag_size);
+
+    SDL_GPUShader *vs = nullptr;
+    SDL_GPUShader *fs = nullptr;
+    SDL_GPUShaderCreateInfo vi = {
+      .code_size = vert_size,
+      .code = (uint8_t*)vert_code,
+      .entrypoint = "main",
+      .format = SDL_GPU_SHADERFORMAT_SPIRV,
+      .stage = SDL_GPU_SHADERSTAGE_VERTEX,
+      .num_samplers = 0,
+      .num_storage_buffers = 0,
+      .num_uniform_buffers = 0,
+      .props = 0
+    };
+    SDL_GPUShaderCreateInfo fi = {
+      .code_size = vert_size,
+      .code = (uint8_t*)frag_code,
+      .entrypoint = "main",
+      .format = SDL_GPU_SHADERFORMAT_SPIRV,
+      .stage = SDL_GPU_SHADERSTAGE_FRAGMENT,
+      .num_samplers = 0,
+      .num_storage_buffers = 0,
+      .num_uniform_buffers = 0,
+      .props = 0
+    };
+    vs = SDL_CreateGPUShader(device, &vi);
+    if (!vs) { log_err("Vertex Shader %s\n"); SDL_GetError(); return; }
+    fs = SDL_CreateGPUShader(device, &fi);
+    if (!fs) { log_err("Frag Shader %s\n"); SDL_GetError(); return; }
+
+    SDL_free(frag_code);
+    SDL_free(vert_code);
+
+
+    SDL_GPUVertexBufferDescription vbd = {
+      .slot = 0,
+      .pitch = 12, // 12 floats per vertex.
+      .input_rate = SDL_GPU_VERTEXINPUTRATE_VERTEX,
+      .instance_step_rate = 0,
+    };
+    SDL_GPUVertexAttribute vad = {
+      .location = 0,
+      .buffer_slot = 0,
+      .format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3,
+      .offset = 0,
+    };
+    SDL_GPUColorTargetDescription ctd = {
+      .format = SDL_GetGPUSwapchainTextureFormat(device, window),
+    };
+    SDL_GPUGraphicsPipelineCreateInfo gp_i = {
+      .vertex_shader = vs,
+      .fragment_shader = fs,
+      .vertex_input_state = {
+        .vertex_buffer_descriptions = &vbd,
+        .num_vertex_buffers = 1,
+        .vertex_attributes = &vad,
+        .num_vertex_attributes = 1,
+      },
+      .primitive_type = SDL_GPU_PRIMITIVETYPE_TRIANGLELIST,
+      .target_info = {
+        .color_target_descriptions = &ctd,
+        .num_color_targets = 1
+      },
+    };
+    gp = SDL_CreateGPUGraphicsPipeline(device, &gp_i);
+    if (!gp) { log_err("Failed to create graphics pipeline: %s\n", SDL_GetError()); return; }
+  }
+}

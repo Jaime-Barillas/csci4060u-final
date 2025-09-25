@@ -4,6 +4,8 @@
 #include <ui.h>
 #include <vector>
 
+#include <SDL3/SDL_gpu.h>
+
 int main(int argc, const char **argv) {
   std::filesystem::path exe_path(argv[0]);
 
@@ -18,6 +20,7 @@ int main(int argc, const char **argv) {
     std::println("Failed to create ui");
     return 1;
   }
+  test_compute(ps);
   while (update_ui()) {
     render_ui2();
   };

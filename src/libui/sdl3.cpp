@@ -1,9 +1,11 @@
 #include "sdl3.h"
+#include <filesystem>
 #include "log.h"
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_gpu.h>
 #include <SDL3/SDL_init.h>
 #include <SDL3/SDL_video.h>
+#include <vector>
 
 namespace sdl3 {
   using sdl3_return_t = std::expected<SDLCtx, SDLError>;
@@ -80,17 +82,60 @@ namespace sdl3 {
         SDL_Quit();
         [[fallthrough]];
       case SDLErrorType::Initialization:
+      default:
         break;
     }
 
     return error;
   }
 
-  std::expected<SDLCtx, SDLError> make_window() {
+  sdl3_return_t make_window() {
     _fn_ = "sdl3::make_window";
     return _init_sdl()
       .and_then(_create_window)
       .and_then(_create_gpu_device_and_claim_window)
       .transform_error(_teardown_on_error);
+  }
+
+  // TODO: Here: std::expected load_shader -> load_shader (maybe with a reduce?)
+  //         i.e. reduce load_shader pipeline.shaders
+  //                .and_then compile_shaders
+  //                .and_then compile_pipeline_impl <-- impl needed so we can call and_then but can the impl not be a separate fn?
+  uint8_t *load_shader(SDLShader &shader) {
+    namespace fs = std::filesystem;
+
+    fs::path path{shader.path};
+    if (!fs::exists(path)) {
+      return nullptr;
+    }
+
+    return code;
+  }
+
+  // TODO: Smarter??? If pipelines share shaders they will be loaded from disk
+  //         multiple times.
+  sdl3_return_t compile_pipeline(SDLCtx *ctx, SDLPipeline pipeline) {
+    _fn_ = "sdl3::compile_pipelines";
+
+    load_shader(pipeline.shaders[0]);
+    compile_pipeline_graphics: {
+      {
+        .name = "normal+depth-pass",
+        .type = SDLPipelineType::Graphics,
+        .shaders = {
+          {
+            .path = "shaders/vert.spv",
+            .entry_point = "main",
+            .type = SDLShaderType::Vertex,
+            .graphics_info = {.num_storage_buffers = 1}
+          },
+          {
+            .path = "shaders/frag.spv",
+            .entry_point = "main",
+            .type = SDLShaderType::Fragment,
+          },
+        },
+      };
+    };
   }
 }

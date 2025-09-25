@@ -7,7 +7,7 @@
 #include <vector>
 
 namespace particles {
-  constexpr int32_t DEFAULT_PARTICLE_COUNT = util::pow(100, 3);
+  constexpr int32_t DEFAULT_PARTICLE_COUNT = util::pow(10, 3);
   constexpr float USABLE_SPACE_MODIFIER = 0.8f;
   constexpr float SUPPORT = 10;
 
