@@ -1,24 +1,23 @@
 set(
-  UI_SRCS
-    "${CMAKE_CURRENT_SOURCE_DIR}/ui.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/log.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/sdl3.cpp"
+  COMMON_SRCS
+    "${CMAKE_CURRENT_SOURCE_DIR}/lib.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/lib-c.cpp"
 )
 
-add_library(ui STATIC ${UI_SRCS})
+add_library(common STATIC ${COMMON_SRCS})
 target_include_directories(
-  ui
+  common
   INTERFACE
     "${CMAKE_CURRENT_SOURCE_DIR}"
 )
 target_link_libraries(
-  ui
+  common
   PUBLIC
     SDL3_ttf::SDL3_ttf
     SDL3::SDL3
 )
 target_compile_definitions(
-  ui
+  common
   PRIVATE
     "$<$<CONFIG:Debug>:LogEnabled=1>"
 )

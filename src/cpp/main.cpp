@@ -1,30 +1,66 @@
-#include "particles.h"
+// #include "particles.h"
+// #include <vector>
 #include <filesystem>
+#include <lib.h>
 #include <print>
-#include <ui.h>
-#include <vector>
-
 #include <SDL3/SDL_gpu.h>
+
+
+bool update(libcommon::SDLCtx *ctx) {
+  return libcommon::update_window(ctx);
+}
+
+void draw(libcommon::SDLCtx *ctx) {
+  SDL_GPUCommandBuffer *render_cmds;
+  SDL_GPUTexture *swapchain_tex;
+
+  render_cmds = SDL_AcquireGPUCommandBuffer(ctx->device);
+  if (!SDL_WaitAndAcquireGPUSwapchainTexture(render_cmds, ctx->window, &swapchain_tex, nullptr, nullptr)) {
+    SDL_CancelGPUCommandBuffer(render_cmds);
+    return;
+  }
+
+  SDL_GPUColorTargetInfo cti = {
+    .texture = swapchain_tex,
+    .clear_color = { .r = 0.00, .g = 0.05, .b = 0.25 },
+    .load_op = SDL_GPU_LOADOP_CLEAR,
+    .store_op = SDL_GPU_STOREOP_STORE,
+  };
+
+  SDL_GPURenderPass *render_pass = SDL_BeginGPURenderPass(render_cmds, &cti, 1, nullptr);
+  SDL_EndGPURenderPass(render_pass);
+  SDL_SubmitGPUCommandBuffer(render_cmds);
+}
+
+libcommon::SDLCtx *run_loop(libcommon::SDLCtx *ctx) {
+  bool run = true;
+  while (run) {
+    run = update(ctx);
+    draw(ctx);
+  }
+
+  return ctx;
+
+  // std::vector<Particle> ps;
+
+  // particles::reset(ps, particles::DEFAULT_PARTICLE_COUNT, -100, 100);
+  // std::println("({}, {}, {})", ps[0].pos.x, ps[0].pos.y, ps[0].pos.z);
+  // std::println("({}, {}, {})", ps[1].pos.x, ps[1].pos.y, ps[1].pos.z);
+  // std::println("  Poly: {}", particles::kernel<particles::PolyKernel>(ps[0].pos, ps[1].pos));
+}
 
 int main(int argc, const char **argv) {
   std::filesystem::path exe_path(argv[0]);
 
-  std::vector<Particle> ps;
+  auto ctx = libcommon::make_window()
+    .and_then([](auto ctx){ return libcommon::setup_gpu_buffers(ctx, 100); })
+    .transform(run_loop)
+    .transform(libcommon::destroy_window);
 
-  particles::reset(ps, particles::DEFAULT_PARTICLE_COUNT, -100, 100);
-  std::println("({}, {}, {})", ps[0].pos.x, ps[0].pos.y, ps[0].pos.z);
-  std::println("({}, {}, {})", ps[1].pos.x, ps[1].pos.y, ps[1].pos.z);
-  std::println("  Poly: {}", particles::kernel<particles::PolyKernel>(ps[0].pos, ps[1].pos));
-
-  if (!create_ui(exe_path.parent_path().c_str())) {
-    std::println("Failed to create ui");
+  if (!ctx) {
+    std::println("Unknown Error!");
     return 1;
   }
-  test_compute(ps);
-  while (update_ui()) {
-    render_ui2();
-  };
-  destroy_ui();
 
   return 0;
 }

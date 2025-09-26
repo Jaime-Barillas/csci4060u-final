@@ -1,7 +1,6 @@
 set(
   CPP_SRCS
   "${CMAKE_CURRENT_SOURCE_DIR}/main.cpp"
-  "${CMAKE_CURRENT_SOURCE_DIR}/particles.cpp"
 )
 
 # Sequential C program
@@ -12,7 +11,7 @@ add_executable(
 target_link_libraries(
   sph-cpp
   PUBLIC
-    ui
+    common
 )
 set_target_properties(
   sph-cpp
@@ -33,7 +32,7 @@ target_link_libraries(
   sph-cpp-par
   PUBLIC
     Threads::Threads
-    ui
+    common
 )
 set_target_properties(
   sph-cpp-par
