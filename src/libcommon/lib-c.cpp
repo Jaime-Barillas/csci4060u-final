@@ -4,18 +4,11 @@
 #include "SDL3/SDL_gpu.h"
 #include "Vec3.h"
 #include <cstdint>
-#include <map>
+#include <utility>
 
 
 typedef uint32_t CError;
 typedef const Vec3 *const * vec3_list;
-
-const std::map<libcommon::SDLErrorType, CError> sdl_err_map = {
-  { libcommon::SDLErrorType::Initialization,    1 << 0 },
-  { libcommon::SDLErrorType::WindowCreation,    1 << 1 },
-  { libcommon::SDLErrorType::GpuDeviceCreation, 1 << 2 },
-  { libcommon::SDLErrorType::ClaimingWindow,    1 << 3 },
-};
 
 bool copy_particles(SDL_GPUTransferBuffer *tbuf, const void *particles_obj) {
   vec3_list particles = static_cast<vec3_list>(particles_obj);
@@ -24,31 +17,31 @@ bool copy_particles(SDL_GPUTransferBuffer *tbuf, const void *particles_obj) {
 
 extern "C" {
 
-  CError c_make_ui(libcommon::SDLCtx **ctx) {
-    auto res = libcommon::make_window();
+  CError c_initialize_and_setup(uint32_t particle_count, libcommon::SDLCtx **ctx) {
+    auto res = libcommon::initialize_and_setup(particle_count);
     if (res) {
       *ctx = res.value();
       return 0;
     } else {
-      return sdl_err_map.at(res.error().type);
+      return std::to_underlying(res.error().type);
     }
   }
 
-  void c_destroy_ui(void *ctx_ptr) {
+  void c_teardown(void *ctx_ptr) {
     if (!ctx_ptr) { return; }
     libcommon::SDLCtx *ctx = static_cast<libcommon::SDLCtx*>(ctx_ptr);
-    libcommon::destroy_window(ctx);
+    libcommon::teardown(ctx);
   }
 
-  uint8_t c_update_ui(void *ctx_ptr) {
+  uint8_t c_update(void *ctx_ptr) {
     if (!ctx_ptr) { return 0; }
     libcommon::SDLCtx *ctx = static_cast<libcommon::SDLCtx*>(ctx_ptr);
-    return libcommon::update_window(ctx) ? 1 : 0;
+    return libcommon::update(ctx) ? 1 : 0;
   }
 
-  void c_draw_ui(void *ctx_ptr, vec3_list positions) {
+  void c_draw(void *ctx_ptr, vec3_list positions) {
     if (!ctx_ptr) { return; }
     libcommon::SDLCtx *ctx = static_cast<libcommon::SDLCtx*>(ctx_ptr);
-    auto a = libcommon::draw_particles(ctx, copy_particles, static_cast<const void*>(positions));
+    auto a = libcommon::draw(ctx, copy_particles, static_cast<const void*>(positions));
   }
 };

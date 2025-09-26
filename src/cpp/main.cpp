@@ -7,7 +7,7 @@
 
 
 bool update(libcommon::SDLCtx *ctx) {
-  return libcommon::update_window(ctx);
+  return libcommon::update(ctx);
 }
 
 void draw(libcommon::SDLCtx *ctx) {
@@ -35,7 +35,7 @@ void draw(libcommon::SDLCtx *ctx) {
 libcommon::SDLCtx *run_loop(libcommon::SDLCtx *ctx) {
   bool run = true;
   while (run) {
-    run = update(ctx);
+    run = ::update(ctx);
     draw(ctx);
   }
 
@@ -52,13 +52,12 @@ libcommon::SDLCtx *run_loop(libcommon::SDLCtx *ctx) {
 int main(int argc, const char **argv) {
   std::filesystem::path exe_path(argv[0]);
 
-  auto ctx = libcommon::make_window()
-    .and_then([](auto ctx){ return libcommon::setup_gpu_buffers(ctx, 100); })
+  auto ctx = libcommon::initialize_and_setup(100)
     .transform(run_loop)
-    .transform(libcommon::destroy_window);
+    .transform(libcommon::teardown);
 
   if (!ctx) {
-    std::println("Unknown Error!");
+    std::println("{}", ctx.error());
     return 1;
   }
 
