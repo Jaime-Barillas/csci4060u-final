@@ -18,6 +18,9 @@ namespace libcommon {
     ClaimingWindow      = 1 << 4,
     TransferBufferAlloc = 1 << 5,
     GpuBufferAlloc      = 1 << 6,
+    ShaderNotFound      = 1 << 7,
+    ShaderCreation      = 1 << 9,
+    PipelineCreation    = 1 << 10,
 
     // The 'None' error allows sharing the teardown logic when a setup error
     // ocurrs and during regular shutdown.
@@ -33,7 +36,11 @@ namespace libcommon {
         SDL_GPUBuffer *b = nullptr;
       } point_sprites;
     } bufs;
+    struct {
+      SDL_GPUComputePipeline *gen_point_sprites;
+    } pipelines;
 
+    const char *exe_dir = "";
     uint32_t particle_count = 0;
   };
 
@@ -48,7 +55,7 @@ namespace libcommon {
    * @returns The SDL context (window, gpu device, buffers, shaders &
    *          pipelines) or an error.
    */
-  std::expected<SDLCtx*, SDLError> initialize_and_setup(uint32_t particle_count);
+  std::expected<SDLCtx*, SDLError> initialize_and_setup(const char *exe_dir, uint32_t particle_count);
 
   /**
    * Teardown the SDL context.
@@ -87,6 +94,10 @@ const std::map<libcommon::SDLErrorType, const char*> _err_message = {
   { libcommon::SDLErrorType::ClaimingWindow,      "Failed to claim window for gpu" },
   { libcommon::SDLErrorType::TransferBufferAlloc, "Failed to allocate a transfer buffer" },
   { libcommon::SDLErrorType::GpuBufferAlloc,      "Failed to allocate a gpu buffer" },
+  { libcommon::SDLErrorType::ShaderNotFound,      "Failed to find shader" },
+  { libcommon::SDLErrorType::ShaderCreation,      "Failed to compile shader" },
+  { libcommon::SDLErrorType::PipelineCreation,    "Failed to create gpu pipeline" },
+    // PipelineCreation    = 1 << 10,
 
   { libcommon::SDLErrorType::None,                "No error!" },
 };

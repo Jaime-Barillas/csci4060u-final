@@ -52,7 +52,7 @@ libcommon::SDLCtx *run_loop(libcommon::SDLCtx *ctx) {
 int main(int argc, const char **argv) {
   std::filesystem::path exe_path(argv[0]);
 
-  auto ctx = libcommon::initialize_and_setup(100)
+  auto ctx = libcommon::initialize_and_setup(exe_path.parent_path().c_str(), 100)
     .transform(run_loop)
     .transform(libcommon::teardown);
 

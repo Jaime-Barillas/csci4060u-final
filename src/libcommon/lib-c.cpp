@@ -17,8 +17,8 @@ bool copy_particles(SDL_GPUTransferBuffer *tbuf, const void *particles_obj) {
 
 extern "C" {
 
-  CError c_initialize_and_setup(uint32_t particle_count, libcommon::SDLCtx **ctx) {
-    auto res = libcommon::initialize_and_setup(particle_count);
+  CError c_initialize_and_setup(const char *exe_dir, uint32_t particle_count, libcommon::SDLCtx **ctx) {
+    auto res = libcommon::initialize_and_setup(exe_dir, particle_count);
     if (res) {
       *ctx = res.value();
       return 0;

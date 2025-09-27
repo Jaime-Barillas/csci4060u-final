@@ -1,5 +1,7 @@
 #include "lib.h"
+#include "SDL3/SDL_iostream.h"
 #include "Vec3.h"
+#include <filesystem>
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_gpu.h>
 #include <SDL3/SDL_init.h>
@@ -8,7 +10,7 @@
 namespace libcommon {
   using libcommon_return_t = std::expected<SDLCtx*, SDLError>;
 
-  libcommon_return_t _init_sdl(uint32_t particle_count) {
+  libcommon_return_t _init_sdl(const char *exe_dir, uint32_t particle_count) {
     if (particle_count == 0) {
       return std::unexpected((SDLError){
         .ctx = nullptr,
@@ -23,7 +25,10 @@ namespace libcommon {
       });
     }
 
-    return new SDLCtx{ .particle_count = particle_count };
+    return new SDLCtx{
+      .exe_dir = exe_dir,
+      .particle_count = particle_count,
+    };
   }
 
   SDLError _quit_sdl(SDLError error) {
@@ -153,7 +158,58 @@ namespace libcommon {
     return error;
   }
 
+  libcommon_return_t _create_compute_pipelines(SDLCtx *ctx) {
+    std::filesystem::path exe_dir(ctx->exe_dir);
+    std::filesystem::path shader_path = exe_dir / "shaders" / "gen-point-sprites.spv";
+
+    size_t code_size = 0;
+    void *code = SDL_LoadFile(shader_path.c_str(), &code_size);
+    if (!code) {
+      return std::unexpected((SDLError){
+        .ctx = ctx,
+        .type = SDLErrorType::ShaderNotFound,
+      });
+    }
+
+    SDL_GPUComputePipelineCreateInfo cpi = {
+      .code_size = code_size,
+      .code = (uint8_t*)code,
+      .entrypoint = "main",
+      .format = SDL_GPU_SHADERFORMAT_SPIRV,
+      .num_samplers = 0,
+      .num_readonly_storage_textures = 0,
+      .num_readonly_storage_buffers = 1,
+      .num_readwrite_storage_textures = 0,
+      .num_readwrite_storage_buffers = 1,
+      .num_uniform_buffers = 0,
+      .threadcount_x = 64,
+      .threadcount_y = 1,
+      .threadcount_z = 1,
+      .props = 0,
+    };
+
+    ctx->pipelines.gen_point_sprites = SDL_CreateGPUComputePipeline(ctx->device, &cpi);
+    SDL_free(code);
+    if (!ctx->pipelines.gen_point_sprites) {
+      return std::unexpected((SDLError){
+        .ctx = ctx,
+        .type = SDLErrorType::PipelineCreation,
+      });
+    }
+
+    return ctx;
+  }
+
+  SDLError _destroy_compute_pipelines(SDLError error) {
+    if (error.type > SDLErrorType::PipelineCreation) {
+      SDL_ReleaseGPUComputePipeline(error.ctx->device, error.ctx->pipelines.gen_point_sprites);
+    }
+
+    return error;
+  }
+
   SDLError _teardown_on_error(SDLError error) {
+    _destroy_compute_pipelines(error);
     _teardown_buffers(error);
     _release_window_and_destroy_gpu_device(error);
     _destroy_window(error);
@@ -162,11 +218,12 @@ namespace libcommon {
     return error;
   }
 
-  libcommon_return_t initialize_and_setup(uint32_t particle_count) {
-    return _init_sdl(particle_count)
+  libcommon_return_t initialize_and_setup(const char *exe_dir, uint32_t particle_count) {
+    return _init_sdl(exe_dir, particle_count)
       .and_then(_create_window)
       .and_then(_create_gpu_device_and_claim_window)
       .and_then(_setup_gpu_buffers)
+      .and_then(_create_compute_pipelines)
       .transform_error(_teardown_on_error);
   }
 
