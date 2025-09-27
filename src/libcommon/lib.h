@@ -35,6 +35,9 @@ namespace libcommon {
         SDL_GPUTransferBuffer *t = nullptr;
         SDL_GPUBuffer *b = nullptr;
       } point_sprites;
+      struct {
+        SDL_GPUBuffer *verts = nullptr;
+      } pass1;
     } bufs;
     struct {
       SDL_GPUComputePipeline *gen_point_sprites;
