@@ -1,42 +1,43 @@
 // #include "particles.h"
 // #include <vector>
+#include "SDL3/SDL_stdinc.h"
 #include <filesystem>
 #include <lib.h>
 #include <print>
 #include <SDL3/SDL_gpu.h>
+#include <vector>
 
+
+bool copy_particles(libcommon::SDLCtx *ctx, SDL_GPUTransferBuffer *tbuf, const void *particles_obj) {
+  if (!particles_obj) {
+    return false;
+  }
+
+  const std::vector<float> *ps = static_cast<const std::vector<float>*>(particles_obj);
+
+  void *mapping = (SDL_MapGPUTransferBuffer(ctx->device, ctx->bufs.point_sprites.t, true));
+  if (!mapping) {
+    return false;
+  }
+  SDL_memcpy(mapping, ps->data(), sizeof(float) * ps->size());
+  SDL_UnmapGPUTransferBuffer(ctx->device, ctx->bufs.point_sprites.t);
+
+  return true;
+}
 
 bool update(libcommon::SDLCtx *ctx) {
   return libcommon::update(ctx);
 }
 
 void draw(libcommon::SDLCtx *ctx) {
-  SDL_GPUCommandBuffer *render_cmds;
-  SDL_GPUTexture *swapchain_tex;
-
-  render_cmds = SDL_AcquireGPUCommandBuffer(ctx->device);
-  if (!SDL_WaitAndAcquireGPUSwapchainTexture(render_cmds, ctx->window, &swapchain_tex, nullptr, nullptr)) {
-    SDL_CancelGPUCommandBuffer(render_cmds);
-    return;
-  }
-
-  SDL_GPUColorTargetInfo cti = {
-    .texture = swapchain_tex,
-    .clear_color = { .r = 0.00, .g = 0.05, .b = 0.25 },
-    .load_op = SDL_GPU_LOADOP_CLEAR,
-    .store_op = SDL_GPU_STOREOP_STORE,
-  };
-
-  SDL_GPURenderPass *render_pass = SDL_BeginGPURenderPass(render_cmds, &cti, 1, nullptr);
-  SDL_EndGPURenderPass(render_pass);
-  SDL_SubmitGPUCommandBuffer(render_cmds);
+  libcommon::draw(ctx, copy_particles, nullptr);
 }
 
 libcommon::SDLCtx *run_loop(libcommon::SDLCtx *ctx) {
   bool run = true;
   while (run) {
     run = ::update(ctx);
-    draw(ctx);
+    ::draw(ctx);
   }
 
   return ctx;
@@ -52,7 +53,7 @@ libcommon::SDLCtx *run_loop(libcommon::SDLCtx *ctx) {
 int main(int argc, const char **argv) {
   std::filesystem::path exe_path(argv[0]);
 
-  auto ctx = libcommon::initialize_and_setup(exe_path.parent_path().c_str(), 100)
+  auto ctx = libcommon::initialize_and_setup(exe_path.parent_path().c_str(), 128)
     .transform(run_loop)
     .transform(libcommon::teardown);
 

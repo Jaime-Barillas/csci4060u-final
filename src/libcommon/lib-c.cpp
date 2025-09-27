@@ -10,7 +10,7 @@
 typedef uint32_t CError;
 typedef const Vec3 *const * vec3_list;
 
-bool copy_particles(SDL_GPUTransferBuffer *tbuf, const void *particles_obj) {
+bool copy_particles(libcommon::SDLCtx *ctx, SDL_GPUTransferBuffer *tbuf, const void *particles_obj) {
   vec3_list particles = static_cast<vec3_list>(particles_obj);
   return true;
 }
@@ -42,6 +42,6 @@ extern "C" {
   void c_draw(void *ctx_ptr, vec3_list positions) {
     if (!ctx_ptr) { return; }
     libcommon::SDLCtx *ctx = static_cast<libcommon::SDLCtx*>(ctx_ptr);
-    auto a = libcommon::draw(ctx, copy_particles, static_cast<const void*>(positions));
+    libcommon::draw(ctx, copy_particles, static_cast<const void*>(positions));
   }
 };

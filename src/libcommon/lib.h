@@ -82,15 +82,15 @@ namespace libcommon {
    //       .cpp file instead of here in the header (or another header file)
    //       as would be necessary if it were a templated function. We only
    //       lose the ability to use C++ lambdas ¯\_(ツ)_/¯.
-  std::expected<SDLCtx*, SDLError> draw(
+  void draw(
     SDLCtx *ctx,
-    bool (*copy_callback)(SDL_GPUTransferBuffer *tbuf, const void *particles_obj),
+    bool (*copy_callback)(SDLCtx *ctx, SDL_GPUTransferBuffer *tbuf, const void *particles_obj),
     const void *particles_obj
   );
 }
 
 const std::map<libcommon::SDLErrorType, const char*> _err_message = {
-  { libcommon::SDLErrorType::BadParticleCount,    "Invalid particle count" },
+  { libcommon::SDLErrorType::BadParticleCount,    "Invalid particle count (Must be multiple of 64)" },
   { libcommon::SDLErrorType::Initialization,      "Failed to init SDL" },
   { libcommon::SDLErrorType::WindowCreation,      "Failed to create window" },
   { libcommon::SDLErrorType::GpuDeviceCreation,   "Failed to create gpu device" },

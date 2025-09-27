@@ -11,7 +11,8 @@ namespace libcommon {
   using libcommon_return_t = std::expected<SDLCtx*, SDLError>;
 
   libcommon_return_t _init_sdl(const char *exe_dir, uint32_t particle_count) {
-    if (particle_count == 0) {
+    // NOTE: Hard-coded workgroup size total of 64.
+    if (particle_count == 0 || particle_count % 64 != 0) {
       return std::unexpected((SDLError){
         .ctx = nullptr,
         .type = SDLErrorType::BadParticleCount,
@@ -259,5 +260,73 @@ namespace libcommon {
     }
 
     return true;
+  }
+
+  void draw(
+    SDLCtx *ctx,
+    bool (*copy_callback)(SDLCtx *ctx, SDL_GPUTransferBuffer *tbuf, const void *particles_obj),
+    const void *particles_obj
+  ) {
+
+    SDL_GPUCommandBuffer *cmds;
+    SDL_GPUTexture *swapchain_tex;
+
+    cmds = SDL_AcquireGPUCommandBuffer(ctx->device);
+    if (!SDL_WaitAndAcquireGPUSwapchainTexture(cmds, ctx->window, &swapchain_tex, nullptr, nullptr)) {
+      SDL_CancelGPUCommandBuffer(cmds);
+      return;
+    }
+
+    upload_particles: {
+      bool copy_result = false;
+      if (copy_callback) {
+        copy_result = copy_callback(ctx, ctx->bufs.point_sprites.t, particles_obj);
+      }
+      if (!copy_result) {
+        goto gen_point_sprites; // TODO: No gotos?
+      }
+
+      SDL_GPUTransferBufferLocation source = {
+        .transfer_buffer = ctx->bufs.point_sprites.t,
+        .offset = 0,
+      };
+      SDL_GPUBufferRegion dest = {
+        .buffer = ctx->bufs.point_sprites.b,
+        .offset = 0,
+        .size = static_cast<uint32_t>(sizeof(Vec3) * ctx->particle_count),
+      };
+      SDL_GPUCopyPass *upload_particles_pass = SDL_BeginGPUCopyPass(cmds);
+      SDL_UploadToGPUBuffer(upload_particles_pass, &source, &dest, true);
+      SDL_EndGPUCopyPass(upload_particles_pass);
+    }
+
+    gen_point_sprites: {
+      SDL_GPUStorageBufferReadWriteBinding compute_rw_binding = {
+        .buffer = ctx->bufs.pass1.verts,
+        .cycle = true,
+      };
+      SDL_GPUComputePass *gen_point_sprites_pass = SDL_BeginGPUComputePass(
+        cmds,
+        nullptr, 0,
+        &compute_rw_binding, 1
+      );
+      SDL_BindGPUComputePipeline(gen_point_sprites_pass, ctx->pipelines.gen_point_sprites);
+      // NOTE: Hard-coded workgroup size of 64 in the x dimension.
+      SDL_DispatchGPUCompute(gen_point_sprites_pass, ctx->particle_count / 64, 1, 1);
+      SDL_EndGPUComputePass(gen_point_sprites_pass);
+    }
+
+    render_pass: {
+      SDL_GPUColorTargetInfo cti = {
+        .texture = swapchain_tex,
+        .clear_color = { .r = 0.00, .g = 0.05, .b = 0.25 },
+        .load_op = SDL_GPU_LOADOP_CLEAR,
+        .store_op = SDL_GPU_STOREOP_STORE,
+      };
+      SDL_GPURenderPass *render_pass = SDL_BeginGPURenderPass(cmds, &cti, 1, nullptr);
+      SDL_EndGPURenderPass(render_pass);
+    }
+
+    SDL_SubmitGPUCommandBuffer(cmds);
   }
 }
