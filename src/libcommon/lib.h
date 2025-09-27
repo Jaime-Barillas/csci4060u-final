@@ -11,16 +11,17 @@
 
 namespace libcommon {
   enum class SDLErrorType : uint32_t {
-    BadParticleCount    = 1 << 0,
-    Initialization      = 1 << 1,
-    WindowCreation      = 1 << 2,
-    GpuDeviceCreation   = 1 << 3,
-    ClaimingWindow      = 1 << 4,
-    TransferBufferAlloc = 1 << 5,
-    GpuBufferAlloc      = 1 << 6,
-    ShaderNotFound      = 1 << 7,
-    ShaderCreation      = 1 << 9,
-    PipelineCreation    = 1 << 10,
+    BadParticleCount         = 1 << 0,
+    Initialization           = 1 << 1,
+    WindowCreation           = 1 << 2,
+    GpuDeviceCreation        = 1 << 3,
+    ClaimingWindow           = 1 << 4,
+    TransferBufferAlloc      = 1 << 5,
+    GpuBufferAlloc           = 1 << 6,
+    ShaderNotFound           = 1 << 7,
+    ShaderCreation           = 1 << 9,
+    ComputePipelineCreation  = 1 << 10,
+    GraphicsPipelineCreation = 1 << 11,
 
     // The 'None' error allows sharing the teardown logic when a setup error
     // ocurrs and during regular shutdown.
@@ -40,7 +41,12 @@ namespace libcommon {
       } pass1;
     } bufs;
     struct {
+      SDL_GPUShader *pass1_vertex;
+      SDL_GPUShader *pass1_fragment;
+    } shaders;
+    struct {
       SDL_GPUComputePipeline *gen_point_sprites;
+      SDL_GPUGraphicsPipeline *pass1;
     } pipelines;
 
     const char *exe_dir = "";
@@ -90,16 +96,17 @@ namespace libcommon {
 }
 
 const std::map<libcommon::SDLErrorType, const char*> _err_message = {
-  { libcommon::SDLErrorType::BadParticleCount,    "Invalid particle count (Must be multiple of 64)" },
-  { libcommon::SDLErrorType::Initialization,      "Failed to init SDL" },
-  { libcommon::SDLErrorType::WindowCreation,      "Failed to create window" },
-  { libcommon::SDLErrorType::GpuDeviceCreation,   "Failed to create gpu device" },
-  { libcommon::SDLErrorType::ClaimingWindow,      "Failed to claim window for gpu" },
-  { libcommon::SDLErrorType::TransferBufferAlloc, "Failed to allocate a transfer buffer" },
-  { libcommon::SDLErrorType::GpuBufferAlloc,      "Failed to allocate a gpu buffer" },
-  { libcommon::SDLErrorType::ShaderNotFound,      "Failed to find shader" },
-  { libcommon::SDLErrorType::ShaderCreation,      "Failed to compile shader" },
-  { libcommon::SDLErrorType::PipelineCreation,    "Failed to create gpu pipeline" },
+  { libcommon::SDLErrorType::BadParticleCount,            "Invalid particle count (Must be multiple of 64)" },
+  { libcommon::SDLErrorType::Initialization,              "Failed to init SDL" },
+  { libcommon::SDLErrorType::WindowCreation,              "Failed to create window" },
+  { libcommon::SDLErrorType::GpuDeviceCreation,           "Failed to create gpu device" },
+  { libcommon::SDLErrorType::ClaimingWindow,              "Failed to claim window for gpu" },
+  { libcommon::SDLErrorType::TransferBufferAlloc,         "Failed to allocate a transfer buffer" },
+  { libcommon::SDLErrorType::GpuBufferAlloc,              "Failed to allocate a gpu buffer" },
+  { libcommon::SDLErrorType::ShaderNotFound,              "Failed to find shader" },
+  { libcommon::SDLErrorType::ShaderCreation,              "Failed to compile shader" },
+  { libcommon::SDLErrorType::ComputePipelineCreation,     "Failed to create gpu compute pipelines" },
+  { libcommon::SDLErrorType::GraphicsPipelineCreation,    "Failed to create gpu graphics pipelines" },
     // PipelineCreation    = 1 << 10,
 
   { libcommon::SDLErrorType::None,                "No error!" },
@@ -120,21 +127,42 @@ struct std::formatter<libcommon::SDLError> {
     libcommon::SDLCtx *c = error.ctx;
     const void *window = c ? static_cast<const void*>(c->window) : nullptr;
     const void *device = c ? static_cast<const void*>(c->device) : nullptr;
+    const char *exe_dir = c ? static_cast<const char*>(c->exe_dir) : nullptr;
     uint32_t particle_count = c ? c->particle_count : 0;
     const void *point_sprites_t = c ? static_cast<const void*>(c->bufs.point_sprites.t) : nullptr;
     const void *point_sprites_b = c ? static_cast<const void*>(c->bufs.point_sprites.b) : nullptr;
+    const void *pass1_b = c ? static_cast<const void*>(c->bufs.pass1.verts) : nullptr;
+    const void *pass1_vertex_shader = c ? static_cast<const void*>(c->shaders.pass1_vertex) : nullptr;
+    const void *pass1_fragment_shader = c ? static_cast<const void*>(c->shaders.pass1_fragment) : nullptr;
+    const void *compute_pipeline = c ? static_cast<const void*>(c->pipelines.gen_point_sprites) : nullptr;
+    const void *graphics_pipeline = c ? static_cast<const void*>(c->pipelines.pass1) : nullptr;
 
     return std::format_to(
       ctx.out(),
 R"({}
   window: {}  gpu_device: {}
+  exe_dir: {}
   particle_count: {}
-  bufs>point_sprits
-    tbuf: {}  buf: {})",
+  bufs > point_sprites
+    tbuf: {}  buf: {}
+  bufs > pass1
+    vertex buffer: {}
+  shaders
+    pass1_vertex: {}
+    pass1_fragment: {}
+  pipelines
+    gen_point_sprites: {}
+    pass1: {})",
       _err_message.at(error.type),
       window, device,
+      exe_dir,
       particle_count,
-      point_sprites_t, point_sprites_b
+      point_sprites_t, point_sprites_b,
+      pass1_b,
+      pass1_vertex_shader,
+      pass1_fragment_shader,
+      compute_pipeline,
+      graphics_pipeline
     );
   }
 };
