@@ -283,7 +283,7 @@ namespace libcommon {
 
     SDL_GPUVertexBufferDescription gpi_vbd = {
       .slot = 0,
-      .pitch = sizeof(Vec3),
+      .pitch = sizeof(float) * 4,
       .input_rate = SDL_GPU_VERTEXINPUTRATE_VERTEX,
       .instance_step_rate = 0,
     };

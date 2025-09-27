@@ -10,6 +10,8 @@ add_custom_command(
     -S comp
     -o "${PROJECT_BINARY_DIR}/shaders/gen-point-sprites.spv"
     "${CMAKE_CURRENT_SOURCE_DIR}/gen-point-sprites.glsl"
+  DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/gen-point-sprites.glsl"
 )
 add_custom_target(
   shader-gen-point-sprites
