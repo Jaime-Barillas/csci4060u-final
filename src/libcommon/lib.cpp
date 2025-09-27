@@ -311,6 +311,7 @@ namespace libcommon {
         &compute_rw_binding, 1
       );
       SDL_BindGPUComputePipeline(gen_point_sprites_pass, ctx->pipelines.gen_point_sprites);
+      SDL_BindGPUComputeStorageBuffers(gen_point_sprites_pass, 0, &(ctx->bufs.point_sprites.b), 1);
       // NOTE: Hard-coded workgroup size of 64 in the x dimension.
       SDL_DispatchGPUCompute(gen_point_sprites_pass, ctx->particle_count / 64, 1, 1);
       SDL_EndGPUComputePass(gen_point_sprites_pass);
