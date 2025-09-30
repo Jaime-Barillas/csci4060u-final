@@ -309,6 +309,9 @@ namespace libcommon {
         .num_vertex_attributes = 1,
       },
       .primitive_type = SDL_GPU_PRIMITIVETYPE_TRIANGLELIST,
+      .rasterizer_state = {
+        .enable_depth_clip = true,
+      },
       .target_info = {
         .color_target_descriptions = &gpi_ctd,
         .num_color_targets = 1,
