@@ -50,6 +50,8 @@ add_custom_command(
     -S frag
     -o "${PROJECT_BINARY_DIR}/shaders/fragment.spv"
     "${CMAKE_CURRENT_SOURCE_DIR}/fragment.glsl"
+  DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/fragment.glsl"
 )
 add_custom_target(
   fragment-shaders

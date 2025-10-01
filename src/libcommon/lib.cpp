@@ -1,4 +1,5 @@
 #include "lib.h"
+#include "matrix.h"
 #include "Vec3.h"
 #include <expected>
 #include <filesystem>
@@ -57,6 +58,9 @@ namespace libcommon {
 
     bounds.w = (bounds.w * 2) / 3;
     bounds.h = (bounds.h * 2) / 3;
+    float aspect_ratio = static_cast<float>(bounds.w) / bounds.h;
+    // TODO: Actual values for params.
+    ctx->projection = matrix::perspective(1, aspect_ratio, -1, 1);
 
     ctx->window = SDL_CreateWindow("fluid-sim-sph", bounds.w, bounds.h, 0);
     if (!ctx->window) {
@@ -247,7 +251,7 @@ namespace libcommon {
       .num_samplers = 0,
       .num_storage_textures = 0,
       .num_storage_buffers = 0,
-      .num_uniform_buffers = 0,
+      .num_uniform_buffers = 1,
       .props = 0,
     };
 
@@ -456,6 +460,7 @@ namespace libcommon {
       SDL_GPURenderPass *render_pass = SDL_BeginGPURenderPass(cmds, &cti, 1, nullptr);
       SDL_BindGPUGraphicsPipeline(render_pass, ctx->pipelines.pass1);
       SDL_BindGPUVertexBuffers(render_pass, 0, &vertex_buffer_binding, 1);
+      SDL_PushGPUVertexUniformData(cmds, 0, &(ctx->projection), sizeof(matrix::Mat4));
       SDL_DrawGPUPrimitives(render_pass, num_vertices, 1, 0, 0);
       SDL_EndGPURenderPass(render_pass);
     }

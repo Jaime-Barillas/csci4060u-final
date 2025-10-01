@@ -2,6 +2,7 @@ set(
   COMMON_SRCS
     "${CMAKE_CURRENT_SOURCE_DIR}/lib.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/lib-c.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/matrix.cpp"
 )
 
 add_library(common STATIC ${COMMON_SRCS})

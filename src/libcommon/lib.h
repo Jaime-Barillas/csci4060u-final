@@ -1,5 +1,6 @@
 #pragma once
 
+#include "matrix.h"
 #include <cstdint>
 #include <expected>
 #include <format>
@@ -50,6 +51,7 @@ namespace libcommon {
     } pipelines;
 
     const char *exe_dir = "";
+    matrix::Mat4 projection;
     uint32_t particle_count = 0;
   };
 
