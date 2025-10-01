@@ -51,6 +51,7 @@ namespace libcommon {
     } pipelines;
 
     const char *exe_dir = "";
+    matrix::Mat4 model_view;
     matrix::Mat4 projection;
     uint32_t particle_count = 0;
   };

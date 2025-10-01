@@ -202,7 +202,7 @@ namespace libcommon {
       .num_readonly_storage_buffers = 1,
       .num_readwrite_storage_textures = 0,
       .num_readwrite_storage_buffers = 1,
-      .num_uniform_buffers = 0,
+      .num_uniform_buffers = 1,
       .threadcount_x = 64,
       .threadcount_y = 1,
       .threadcount_z = 1,
@@ -440,6 +440,7 @@ namespace libcommon {
       );
       SDL_BindGPUComputePipeline(gen_point_sprites_pass, ctx->pipelines.gen_point_sprites);
       SDL_BindGPUComputeStorageBuffers(gen_point_sprites_pass, 0, &(ctx->bufs.point_sprites.b), 1);
+      SDL_PushGPUComputeUniformData(cmds, 0, &(ctx->model_view), sizeof(matrix::Mat4));
       // NOTE: Hard-coded workgroup size of 64 in the x dimension.
       SDL_DispatchGPUCompute(gen_point_sprites_pass, ctx->particle_count / 64, 1, 1);
       SDL_EndGPUComputePass(gen_point_sprites_pass);

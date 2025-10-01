@@ -9,25 +9,29 @@ layout(std430, set = 0, binding = 0) readonly buffer ParticleBuffer {
 
 // NOTE: Triangle list.
 layout(std430, set = 1, binding = 0) buffer VertexBuffer {
-    vec3 pos[];
+    vec4 pos[];
     // float padding;
 } vertices;
 
+layout(std140, set = 2, binding = 0) readonly buffer TransformBuffer {
+    mat4 view_model;
+} transforms;
+
 const uint VERTICES_PER_QUAD = 6;
-const vec3 VERT_BL_OFFSET = vec3(-0.1, -0.1, 0.0);
-const vec3 VERT_TL_OFFSET = vec3(-0.1,  0.1, 0.0);
-const vec3 VERT_TR_OFFSET = vec3( 0.1,  0.1, 0.0);
-const vec3 VERT_BR_OFFSET = vec3( 0.1, -0.1, 0.0);
+const vec4 VERT_BL_OFFSET = vec4(-0.1, -0.1, 0.0, 0.0);
+const vec4 VERT_TL_OFFSET = vec4(-0.1,  0.1, 0.0, 0.0);
+const vec4 VERT_TR_OFFSET = vec4( 0.1,  0.1, 0.0, 0.0);
+const vec4 VERT_BR_OFFSET = vec4( 0.1, -0.1, 0.0, 0.0);
 
 void main() {
     uint particle_idx = gl_GlobalInvocationID.x;
     uint vertex_base = particle_idx * VERTICES_PER_QUAD;
 
-    vec3 particle_pos = particles.pos[particle_idx];
-    vec3 vert_bl = particle_pos + VERT_BL_OFFSET;
-    vec3 vert_tl = particle_pos + VERT_TL_OFFSET;
-    vec3 vert_tr = particle_pos + VERT_TR_OFFSET;
-    vec3 vert_br = particle_pos + VERT_BR_OFFSET;
+    vec4 particle_pos = transforms.view_model * vec4(particles.pos[particle_idx], 1.0);
+    vec4 vert_bl = particle_pos + VERT_BL_OFFSET;
+    vec4 vert_tl = particle_pos + VERT_TL_OFFSET;
+    vec4 vert_tr = particle_pos + VERT_TR_OFFSET;
+    vec4 vert_br = particle_pos + VERT_BR_OFFSET;
 
     vertices.pos[vertex_base    ] = vert_bl;
     vertices.pos[vertex_base + 1] = vert_tl;

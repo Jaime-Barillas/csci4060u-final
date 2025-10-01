@@ -1,4 +1,5 @@
 // #include "particles.h"
+#include "matrix.h"
 #include <filesystem>
 #include <lib.h>
 #include <print>
@@ -10,6 +11,7 @@
 
 
 std::vector<float> particles;
+float degrees = 0;
 
 bool copy_particles(libcommon::SDLCtx *ctx, SDL_GPUTransferBuffer *tbuf, const void *particles_obj) {
   if (!particles_obj) {
@@ -29,6 +31,8 @@ bool copy_particles(libcommon::SDLCtx *ctx, SDL_GPUTransferBuffer *tbuf, const v
 }
 
 bool update(libcommon::SDLCtx *ctx) {
+  degrees += 0.02f;
+  ctx->model_view = libcommon::matrix::translate_z(2.0f) * libcommon::matrix::rotation_y(degrees);
   return libcommon::update(ctx);
 }
 
@@ -100,8 +104,11 @@ int main(int argc, const char **argv) {
   std::mt19937 rgen(rdev());
   std::uniform_real_distribution<float> rand(-1.0, 1.0);
   particles.reserve(128 * 4);
-  for (int i = 0; i < 128 * 4; i++) {
-    particles.push_back(rand(rgen));
+  for (int i = 0; i < 128; i++) {
+    particles.push_back(rand(rgen)); // x
+    particles.push_back(rand(rgen)); // y
+    particles.push_back(rand(rgen)); // z
+    particles.push_back(1); // w
   }
 
   std::filesystem::path exe_path(argv[0]);

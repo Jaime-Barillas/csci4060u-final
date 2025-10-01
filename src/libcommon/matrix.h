@@ -1,8 +1,10 @@
 #pragma once
 
+#include <type_traits>
+
 namespace libcommon::matrix {
   // NOTE: GLSL uses column major order by default.
-  struct Mat4 {
+  struct alignas(16) Mat4 {
     float m00;
     float m10;
     float m20;
@@ -24,6 +26,24 @@ namespace libcommon::matrix {
     float m33;
   };
 
+  static_assert(std::is_trivially_copyable_v<Mat4>, "libcommon::matrix::Mat4 must be trivially copyable");
+  static_assert(std::is_standard_layout_v<Mat4>, "libcommon::matrix::Mat4 must have standard layout");
+
+  /**
+   * Create a translation along the z-axis.
+   */
+  Mat4 translate_z(float amount);
+
+  /**
+   * Create a rotation about the x-axis.
+   */
+  Mat4 rotation_x(float degrees);
+
+  /**
+   * Create a rotation about the y-axis.
+   */
+  Mat4 rotation_y(float degrees);
+
   /**
    * Create a perspective transform matrix.
    *
@@ -31,3 +51,5 @@ namespace libcommon::matrix {
    */
   Mat4 perspective(float fovy, float aspect_ratio, float near, float far);
 }
+
+libcommon::matrix::Mat4 operator*(const libcommon::matrix::Mat4 &l, const libcommon::matrix::Mat4 &r);
