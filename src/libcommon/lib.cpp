@@ -59,8 +59,12 @@ namespace libcommon {
     bounds.w = (bounds.w * 2) / 3;
     bounds.h = (bounds.h * 2) / 3;
     float aspect_ratio = static_cast<float>(bounds.w) / bounds.h;
-    // TODO: Actual values for params.
-    ctx->projection = matrix::perspective(1, aspect_ratio, -1, 1);
+    // NOTE: near & far get extended an additional amount (from [1, 3]) to
+    //       account for the rotation used in main.cpp. The extent of the
+    //       x-axis (-1 to 1) is larger than the extent of the z-axis (0 to
+    //       1) in NDC. When rotating, it could cause vertices to fall outside
+    //       the clipping range.
+    ctx->projection = matrix::perspective(100, aspect_ratio, 0.5, 3.5);
 
     ctx->window = SDL_CreateWindow("fluid-sim-sph", bounds.w, bounds.h, 0);
     if (!ctx->window) {

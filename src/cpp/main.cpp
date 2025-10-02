@@ -32,7 +32,9 @@ bool copy_particles(libcommon::SDLCtx *ctx, SDL_GPUTransferBuffer *tbuf, const v
 
 bool update(libcommon::SDLCtx *ctx) {
   degrees += 0.02f;
-  ctx->model_view = libcommon::matrix::translate_z(2.0f) * libcommon::matrix::rotation_y(degrees);
+  ctx->model_view = libcommon::matrix::translate_z(2.0f)
+                  // * libcommon::matrix::rotation_x(-20)
+                  * libcommon::matrix::rotation_y(degrees);
   return libcommon::update(ctx);
 }
 
@@ -45,6 +47,7 @@ libcommon::SDLCtx *run_loop(libcommon::SDLCtx *ctx) {
   std::println("{}", err);
 
 
+  ::update(ctx);
   ::draw(ctx);
   SDL_GPUTransferBufferCreateInfo tci = {
     .usage = SDL_GPU_TRANSFERBUFFERUSAGE_DOWNLOAD,
@@ -78,6 +81,7 @@ libcommon::SDLCtx *run_loop(libcommon::SDLCtx *ctx) {
   std::println("2: ({}, {}, {}, {})", m[4], m[5], m[6], m[7]);
   std::println("3: ({}, {}, {}, {})", m[8], m[9], m[10], m[11]);
   std::println("5: ({}, {}, {}, {})", m[16], m[17], m[18], m[19]);
+  std::println("7: ({}, {}, {}, {})", m[24], m[25], m[26], m[27]);
   SDL_UnmapGPUTransferBuffer(ctx->device, tb);
   SDL_ReleaseGPUFence(ctx->device, f);
   SDL_ReleaseGPUTransferBuffer(ctx->device, tb);

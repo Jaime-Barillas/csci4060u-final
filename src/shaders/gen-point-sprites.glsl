@@ -13,9 +13,9 @@ layout(std430, set = 1, binding = 0) buffer VertexBuffer {
     // float padding;
 } vertices;
 
-layout(std140, set = 2, binding = 0) readonly buffer TransformBuffer {
+layout(std140, set = 2, binding = 0) uniform TransformBuffer {
     mat4 view_model;
-} transforms;
+};
 
 const uint VERTICES_PER_QUAD = 6;
 const vec4 VERT_BL_OFFSET = vec4(-0.1, -0.1, 0.0, 0.0);
@@ -27,7 +27,7 @@ void main() {
     uint particle_idx = gl_GlobalInvocationID.x;
     uint vertex_base = particle_idx * VERTICES_PER_QUAD;
 
-    vec4 particle_pos = transforms.view_model * vec4(particles.pos[particle_idx], 1.0);
+    vec4 particle_pos = view_model * vec4(particles.pos[particle_idx], 1.0);
     vec4 vert_bl = particle_pos + VERT_BL_OFFSET;
     vec4 vert_tl = particle_pos + VERT_TL_OFFSET;
     vec4 vert_tr = particle_pos + VERT_TR_OFFSET;

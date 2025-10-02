@@ -55,12 +55,15 @@ namespace libcommon::matrix {
   Mat4 perspective(float fovy, float aspect_ratio, float near, float far) {
     // TODO:
     // See: https://www.songho.ca/opengl/gl_projectionmatrix.html
+    const float tan = std::tanf((fovy * DEGREE_TO_RADIANS) / 2.0f);
+    const float top = near * tan;
+    const float right = top * aspect_ratio;
 
-    // NOTE: The particle data is provided in 
     Mat4 matrix = {};
-    matrix.m00 = 1.0f / aspect_ratio;
-    matrix.m11 = 1.0f;
-    matrix.m22 = 1.0f;
+    matrix.m00 = near / right;
+    matrix.m11 = near / top;
+    matrix.m22 = far / (far - near);
+    matrix.m23 = -(far * near) / (far - near);
     matrix.m32 = 1.0f;
 
     return matrix;
