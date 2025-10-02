@@ -39,6 +39,7 @@ namespace libcommon {
       } point_sprites;
       struct {
         SDL_GPUBuffer *verts = nullptr;
+        SDL_GPUBuffer *texcoords = nullptr;
       } pass1;
     } bufs;
     struct {
