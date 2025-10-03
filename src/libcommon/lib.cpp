@@ -59,6 +59,8 @@ namespace libcommon {
     bounds.w = (bounds.w * 2) / 3;
     bounds.h = (bounds.h * 2) / 3;
     float aspect_ratio = static_cast<float>(bounds.w) / bounds.h;
+    ctx->window_width = bounds.w;
+    ctx->window_height = bounds.h;
     // NOTE: near & far get extended an additional amount (from [1, 3]) to
     //       account for the rotation used in main.cpp. The extent of the
     //       x-axis (-1 to 1) is larger than the extent of the z-axis (0 to
@@ -180,7 +182,7 @@ namespace libcommon {
     if (error.type > SDLErrorType::TransferBufferAlloc ||
         error.type > SDLErrorType::GpuBufferAlloc) {
       if (error.ctx->bufs.pass1.texcoords) {
-        SDL_ReleaseGPUBuffer(error.ctx->device, error.ctx->bufs.pass1.verts);
+        SDL_ReleaseGPUBuffer(error.ctx->device, error.ctx->bufs.pass1.texcoords);
       }
       if (error.ctx->bufs.pass1.verts) {
         SDL_ReleaseGPUBuffer(error.ctx->device, error.ctx->bufs.pass1.verts);
@@ -349,9 +351,16 @@ namespace libcommon {
       .rasterizer_state = {
         .enable_depth_clip = true,
       },
+      .depth_stencil_state = {
+        .compare_op = SDL_GPU_COMPAREOP_LESS_OR_EQUAL,
+        .enable_depth_test = true,
+        .enable_depth_write = true,
+      },
       .target_info = {
         .color_target_descriptions = &gpi_ctd,
         .num_color_targets = 1,
+        .depth_stencil_format = SDL_GPU_TEXTUREFORMAT_D32_FLOAT,
+        .has_depth_stencil_target = true,
       },
     };
 
@@ -383,7 +392,40 @@ namespace libcommon {
     return error;
   }
 
+  libcommon_return_t _create_textures(SDLCtx *ctx) {
+    SDL_GPUTextureCreateInfo tci = {
+      .type = SDL_GPU_TEXTURETYPE_2D,
+      .format = SDL_GPU_TEXTUREFORMAT_D32_FLOAT,
+      .usage = SDL_GPU_TEXTUREUSAGE_DEPTH_STENCIL_TARGET,
+      .width = ctx->window_width,
+      .height = ctx->window_height,
+      .layer_count_or_depth = 1,
+      .num_levels = 1,
+      .sample_count = SDL_GPU_SAMPLECOUNT_1,
+      .props = 0,
+    };
+
+    ctx->textures.depth = SDL_CreateGPUTexture(ctx->device, &tci);
+    if (!ctx->textures.depth) {
+      return std::unexpected((SDLError){
+        .ctx = ctx,
+        .type = SDLErrorType::DepthTextureCreation,
+      });
+    }
+
+    return ctx;
+  }
+
+  SDLError _destroy_textures(SDLError error) {
+    if (error.type > SDLErrorType::DepthTextureCreation) {
+      SDL_ReleaseGPUTexture(error.ctx->device, error.ctx->textures.depth);
+    }
+
+    return error;
+  }
+
   SDLError _teardown_on_error(SDLError error) {
+    _destroy_textures(error);
     _destroy_graphics_pipelines(error);
     _destroy_compute_pipelines(error);
     _teardown_buffers(error);
@@ -401,6 +443,7 @@ namespace libcommon {
       .and_then(_setup_gpu_buffers)
       .and_then(_create_compute_pipelines)
       .and_then(_create_graphics_pipelines)
+      .and_then(_create_textures)
       .transform_error(_teardown_on_error);
   }
 
@@ -492,6 +535,15 @@ namespace libcommon {
         .load_op = SDL_GPU_LOADOP_CLEAR,
         .store_op = SDL_GPU_STOREOP_STORE,
       };
+      SDL_GPUDepthStencilTargetInfo dsti = {
+        .texture = ctx->textures.depth,
+        .clear_depth = 1000,
+        .load_op = SDL_GPU_LOADOP_CLEAR,
+        .store_op = SDL_GPU_STOREOP_STORE,
+        .stencil_load_op = SDL_GPU_LOADOP_CLEAR,
+        .stencil_store_op = SDL_GPU_STOREOP_DONT_CARE,
+        .cycle = true,
+      };
       SDL_GPUBufferBinding vertex_buffer_bindings[2] = {
         {
           .buffer = ctx->bufs.pass1.verts,
@@ -503,7 +555,7 @@ namespace libcommon {
         },
       };
       uint32_t num_vertices = ctx->particle_count * 6;
-      SDL_GPURenderPass *render_pass = SDL_BeginGPURenderPass(cmds, &cti, 1, nullptr);
+      SDL_GPURenderPass *render_pass = SDL_BeginGPURenderPass(cmds, &cti, 1, &dsti);
       SDL_BindGPUGraphicsPipeline(render_pass, ctx->pipelines.pass1);
       SDL_BindGPUVertexBuffers(render_pass, 0, vertex_buffer_bindings, 2);
       SDL_PushGPUVertexUniformData(cmds, 0, &(ctx->projection), sizeof(matrix::Mat4));

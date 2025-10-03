@@ -23,6 +23,7 @@ namespace libcommon {
     ShaderCreation           = 1 << 9,
     ComputePipelineCreation  = 1 << 10,
     GraphicsPipelineCreation = 1 << 11,
+    DepthTextureCreation     = 1 << 12,
 
     // The 'None' error allows sharing the teardown logic when a setup error
     // ocurrs and during regular shutdown.
@@ -50,10 +51,15 @@ namespace libcommon {
       SDL_GPUComputePipeline *gen_point_sprites;
       SDL_GPUGraphicsPipeline *pass1;
     } pipelines;
+    struct {
+      SDL_GPUTexture *depth = nullptr;
+    } textures;
 
     const char *exe_dir = "";
     matrix::Mat4 model_view;
     matrix::Mat4 projection;
+    uint32_t window_width = 0;
+    uint32_t window_height = 0;
     uint32_t particle_count = 0;
   };
 
@@ -111,7 +117,7 @@ const std::map<libcommon::SDLErrorType, const char*> _err_message = {
   { libcommon::SDLErrorType::ShaderCreation,              "Failed to compile shader" },
   { libcommon::SDLErrorType::ComputePipelineCreation,     "Failed to create gpu compute pipelines" },
   { libcommon::SDLErrorType::GraphicsPipelineCreation,    "Failed to create gpu graphics pipelines" },
-    // PipelineCreation    = 1 << 10,
+  { libcommon::SDLErrorType::DepthTextureCreation,        "Failed to create gpu depth texture" },
 
   { libcommon::SDLErrorType::None,                "No error!" },
 };
