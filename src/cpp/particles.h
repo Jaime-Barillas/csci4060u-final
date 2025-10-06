@@ -2,14 +2,22 @@
 
 #include <concepts>
 #include <cstdint>
-#include <ui.h>
-#include "util.h"
 #include <vector>
 
 namespace particles {
-  constexpr int32_t DEFAULT_PARTICLE_COUNT = util::pow(10, 3);
   constexpr float USABLE_SPACE_MODIFIER = 0.8f;
   constexpr float SUPPORT = 10;
+
+  struct Vec3 {
+    float x;
+    float y;
+    float z;
+  };
+
+  struct Particle {
+    Vec3 pos;
+    Vec3 vel;
+  };
 
   void reset(
     std::vector<Particle> &particles,

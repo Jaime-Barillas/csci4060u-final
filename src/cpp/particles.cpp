@@ -1,10 +1,9 @@
 #include "particles.h"
+#include "util.h"
 #include <cmath>
 #include <cstdint>
 #include <numbers>
 #include <ranges>
-#include <ui.h>
-#include "util.h"
 #include <vector>
 
 namespace particles {
@@ -21,7 +20,7 @@ namespace particles {
     particles.resize(count);
     for (uint32_t i : std::views::iota(0u, count)) {
       uint32_t x = i % length;
-      uint32_t y = i / length;
+      uint32_t y = (i / length) % length;
       uint32_t z = i / (length * length);
       particles[i].pos = {
         .x = start + (x * step),
