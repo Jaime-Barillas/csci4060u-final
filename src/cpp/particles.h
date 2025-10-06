@@ -6,7 +6,10 @@
 
 namespace particles {
   constexpr float USABLE_SPACE_MODIFIER = 0.8f;
-  constexpr float SUPPORT = 10;
+  constexpr float SUPPORT = 0.40f;
+  constexpr float GAS_CONSTANT = 0.001f;
+  constexpr float REST_DENSITY = 500.0f;
+  constexpr float VISCOSITY_CONSTANT = 0.01f;
 
   struct Vec3 {
     float x;
@@ -17,6 +20,11 @@ namespace particles {
   struct Particle {
     Vec3 pos;
     Vec3 vel;
+    Vec3 pforce; // Pressure forces
+    Vec3 vforce; // Viscosity forces
+    Vec3 eforce; // External forces
+    float density;
+    float pressure;
   };
 
   void reset(
@@ -27,8 +35,8 @@ namespace particles {
   );
 
   struct PolyKernel      { using return_type = float; };
-  struct SpikyGradKernel { using return_type = float; };
-  struct ViscLaplKernel  { using return_type = float; };
+  struct SpikyGradKernel { using return_type = Vec3; };
+  struct ViscLaplKernel  { using return_type = Vec3; };
 
   template<typename T>
   concept Kernel = std::same_as<T, PolyKernel> ||

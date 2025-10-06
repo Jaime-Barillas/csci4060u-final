@@ -1,4 +1,5 @@
 #include "particles.h"
+#include <algorithm>
 #include <filesystem>
 #include <lib.h>
 #include <matrix.h>
@@ -10,6 +11,12 @@
 
 
 constexpr uint32_t PARTICLE_COUNT = 256;
+constexpr float LEFT_BOUND = -1.0;
+constexpr float RIGHT_BOUND = 1.0;
+constexpr float LOWER_BOUND = -1.0;
+constexpr float UPPER_BOUND = 1.0;
+constexpr float BACKWARD_BOUND = -1.0;
+constexpr float FORWARD_BOUND = 1.0;
 std::vector<particles::Particle> ps;
 float degrees = 0;
 
@@ -36,10 +43,101 @@ bool copy_particles(libcommon::SDLCtx *ctx, SDL_GPUTransferBuffer *tbuf, const v
 }
 
 bool update(libcommon::SDLCtx *ctx) {
-  degrees += 0.3f;
+  // 1. Model View matrix.
+  // degrees += 0.02f;
   ctx->model_view = libcommon::matrix::translate_z(2.0f)
                   // * libcommon::matrix::rotation_x(-20)
                   * libcommon::matrix::rotation_y(degrees);
+
+  // 2. Density + Pressure value.
+  for (auto &p : ps) {
+    p.density = 0.0;
+    p.pressure = 0.0;
+    for (auto &neighbour : ps) {
+      p.density += particles::kernel<particles::PolyKernel>(p.pos, neighbour.pos);
+    }
+    p.pressure = particles::GAS_CONSTANT * (p.density - particles::REST_DENSITY);
+  }
+
+  // 3. Pressure forces.
+  // FIXME: Something is wrong with the calculation.
+  //        There is a bias towards (-1, -1, -1) even with zero neighbouring particles.
+  particles::Vec3 pressure_kernel_temp;
+  for (auto &p : ps) {
+    particles::Vec3 pressure_temp = { 0, 0, 0 };
+    for (auto &neighbour : ps) {
+      pressure_kernel_temp = particles::kernel<particles::SpikyGradKernel>(p.pos, neighbour.pos);
+      float pressure_factor = (p.pressure + neighbour.pressure) / (2 * neighbour.density);
+      pressure_temp.x += pressure_kernel_temp.x * pressure_factor;
+      pressure_temp.y += pressure_kernel_temp.y * pressure_factor;
+      pressure_temp.z += pressure_kernel_temp.z * pressure_factor;
+    }
+    p.pforce = pressure_temp;
+  }
+
+  // 4. Viscosity forces.
+  particles::Vec3 viscosity_kernel_temp;
+  for (auto &p : ps) {
+    particles::Vec3 viscosity_temp = { 0, 0, 0 };
+    for (auto &neighbour : ps) {
+      viscosity_kernel_temp = particles::kernel<particles::ViscLaplKernel>(p.pos, neighbour.pos);
+      float viscosity_factor_x = (neighbour.vel.x - p.vel.x) / neighbour.density;
+      float viscosity_factor_y = (neighbour.vel.y - p.vel.y) / neighbour.density;
+      float viscosity_factor_z = (neighbour.vel.z - p.vel.z) / neighbour.density;
+      viscosity_temp.x += particles::VISCOSITY_CONSTANT * viscosity_kernel_temp.x * viscosity_factor_x;
+      viscosity_temp.y += particles::VISCOSITY_CONSTANT * viscosity_kernel_temp.y * viscosity_factor_y;
+      viscosity_temp.z += particles::VISCOSITY_CONSTANT * viscosity_kernel_temp.z * viscosity_factor_z;
+    }
+    p.vforce = viscosity_temp;
+  }
+
+  // 5. External forces.
+  // TODO
+  for (auto &p : ps) {
+    p.eforce = { 0.5, 0.5, 0.5 };
+  }
+
+  // 6. Integrate.
+  particles::Vec3 acceleration;
+  for (auto &p : ps) {
+    // F = ma <=> a = F/m, m = 1.0 => a = F
+    acceleration.x = p.pforce.x + p.vforce.x + p.eforce.x;
+    acceleration.y = p.pforce.y + p.vforce.y + p.eforce.y;
+    acceleration.z = p.pforce.z + p.vforce.z + p.eforce.z;
+
+    // v = a * dt;
+    p.vel.x = acceleration.x * (1.0f / 60); // FIXME: actually use delta time.
+    p.vel.y = acceleration.y * (1.0f / 60);
+    p.vel.z = acceleration.z * (1.0f / 60);
+
+    // d = v * dt;
+    p.pos.x += p.vel.x * (1.0f / 60);
+    p.pos.y += p.vel.y * (1.0f / 60);
+    p.pos.z += p.vel.z * (1.0f / 60);
+
+    // Boundary conditions.
+    if (p.pos.x < LEFT_BOUND || p.pos.x > RIGHT_BOUND) {
+      p.pos.x = std::clamp<float>(p.pos.x, LEFT_BOUND, RIGHT_BOUND);
+      p.vel.x *= -0.5;
+    }
+    if (p.pos.y < LOWER_BOUND || p.pos.y > UPPER_BOUND) {
+      p.pos.y = std::clamp<float>(p.pos.y, LOWER_BOUND, UPPER_BOUND);
+      p.vel.y *= -0.5;
+    }
+    if (p.pos.z < BACKWARD_BOUND || p.pos.z > FORWARD_BOUND) {
+      p.pos.z = std::clamp<float>(p.pos.z, BACKWARD_BOUND, FORWARD_BOUND);
+      p.vel.z *= -0.5;
+    }
+  }
+
+  std::print("\x1b[2J\x1b[1;1H");
+  std::print("\x1b[0GDensity(70): {}\n", ps[70].density);
+  std::print("\x1b[0GPressure(70): {}\n", ps[70].pressure);
+  std::print("\x1b[0GPressure Force(70): ({}, {}, {})\n", ps[70].pforce.x, ps[70].pforce.y, ps[70].pforce.z);
+  std::print("\x1b[0GViscosity Force(70): ({}, {}, {})\n", ps[70].vforce.x, ps[70].vforce.y, ps[70].vforce.z);
+  std::print("\x1b[0GExternal Force(70): ({}, {}, {})\n", ps[70].eforce.x, ps[70].eforce.y, ps[70].eforce.z);
+  std::print("\x1b[0GVelocity(70): ({}, {}, {})\n", ps[70].vel.x, ps[70].vel.y, ps[70].vel.z);
+
   return libcommon::update(ctx);
 }
 
@@ -51,19 +149,20 @@ libcommon::SDLCtx *run_loop(libcommon::SDLCtx *ctx) {
   libcommon::SDLError err{ .ctx = ctx, .type = libcommon::SDLErrorType::None };
   std::println("{}", err);
 
-  particles::reset(ps, PARTICLE_COUNT, -1.0, 1.0);
+  particles::reset(ps, PARTICLE_COUNT, LEFT_BOUND, RIGHT_BOUND);
 
+  int count = 0;
   bool run = true;
   while (run) {
     run = ::update(ctx);
     ::draw(ctx);
+
+    // Run longer than one frame to see non-zero values.
+    // count++;
+    // run = (count == 1) ? false : run;
   }
 
   return ctx;
-
-  // std::println("({}, {}, {})", ps[0].pos.x, ps[0].pos.y, ps[0].pos.z);
-  // std::println("({}, {}, {})", ps[1].pos.x, ps[1].pos.y, ps[1].pos.z);
-  // std::println("  Poly: {}", particles::kernel<particles::PolyKernel>(ps[0].pos, ps[1].pos));
 }
 
 int main(int argc, const char **argv) {
