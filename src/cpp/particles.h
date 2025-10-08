@@ -6,10 +6,10 @@
 
 namespace particles {
   constexpr float USABLE_SPACE_MODIFIER = 0.8f;
-  constexpr float SUPPORT = 0.40f;
-  constexpr float GAS_CONSTANT = 0.001f;
-  constexpr float REST_DENSITY = 500.0f;
-  constexpr float VISCOSITY_CONSTANT = 0.01f;
+  constexpr float SUPPORT = 0.33f;
+  constexpr float GAS_CONSTANT = 1.0f;
+  constexpr float REST_DENSITY = 125.0f;
+  constexpr float VISCOSITY_CONSTANT = 0.0f;
 
   struct Vec3 {
     float x;

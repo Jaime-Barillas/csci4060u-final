@@ -53,25 +53,28 @@ namespace particles {
 
   template<>
   Vec3 kernel<SpikyGradKernel>(Vec3 &point, Vec3 &particle) {
-    static constexpr float COEFFICIENT = 45.0f / (std::numbers::pi_v<float> * util::pow(particles::SUPPORT, 6));
+    static constexpr float COEFFICIENT = -45.0f / (std::numbers::pi_v<float> * util::pow(particles::SUPPORT, 6));
 
     float dx = particle.x - point.x;
     float dy = particle.y - point.y;
     float dz = particle.z - point.z;
-    float distsqr = (dx * dx) + (dy * dy) + (dz * dz);
-    float q = (particles::SUPPORT * particles::SUPPORT) - distsqr;
+    float dist = std::sqrtf((dx * dx) + (dy * dy) + (dz * dz));
+    float q = particles::SUPPORT - dist;
 
-    dx = (q < 0) ? 0 : (particles::SUPPORT - dx);
-    dy = (q < 0) ? 0 : (particles::SUPPORT - dy);
-    dz = (q < 0) ? 0 : (particles::SUPPORT - dz);
+    if (q < 0 || dist <= 0) {
+      return { 0, 0, 0 };
+    }
+
+    q = q * q * COEFFICIENT;
 
     return Vec3{
-      .x = (dx * dx * COEFFICIENT),
-      .y = (dy * dy * COEFFICIENT),
-      .z = (dz * dz * COEFFICIENT),
+      .x = q * (dx / dist),
+      .y = q * (dy / dist),
+      .z = q * (dz / dist),
     };
   }
 
+  // FIXME: Redo math.
   template<>
   Vec3 kernel<ViscLaplKernel>(Vec3 &point, Vec3 &particle) {
     static constexpr float COEFFICIENT = 45.0f / (std::numbers::pi_v<float> * util::pow(particles::SUPPORT, 6));

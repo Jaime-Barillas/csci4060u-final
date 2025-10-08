@@ -10,7 +10,7 @@
 #include <vector>
 
 
-constexpr uint32_t PARTICLE_COUNT = 256;
+constexpr uint32_t PARTICLE_COUNT = 1024;
 constexpr float LEFT_BOUND = -1.0;
 constexpr float RIGHT_BOUND = 1.0;
 constexpr float LOWER_BOUND = -1.0;
@@ -61,7 +61,7 @@ bool update(libcommon::SDLCtx *ctx) {
 
   // 3. Pressure forces.
   // FIXME: Something is wrong with the calculation.
-  //        There is a bias towards (-1, -1, -1) even with zero neighbouring particles.
+  //        Particles tend to get 'sucked' into each other.
   particles::Vec3 pressure_kernel_temp;
   for (auto &p : ps) {
     particles::Vec3 pressure_temp = { 0, 0, 0 };
@@ -94,7 +94,7 @@ bool update(libcommon::SDLCtx *ctx) {
   // 5. External forces.
   // TODO
   for (auto &p : ps) {
-    p.eforce = { 0.5, 0.5, 0.5 };
+    p.eforce = { 0, 0, 0 };
   }
 
   // 6. Integrate.
@@ -130,13 +130,13 @@ bool update(libcommon::SDLCtx *ctx) {
     }
   }
 
-  std::print("\x1b[2J\x1b[1;1H");
-  std::print("\x1b[0GDensity(70): {}\n", ps[70].density);
-  std::print("\x1b[0GPressure(70): {}\n", ps[70].pressure);
-  std::print("\x1b[0GPressure Force(70): ({}, {}, {})\n", ps[70].pforce.x, ps[70].pforce.y, ps[70].pforce.z);
-  std::print("\x1b[0GViscosity Force(70): ({}, {}, {})\n", ps[70].vforce.x, ps[70].vforce.y, ps[70].vforce.z);
-  std::print("\x1b[0GExternal Force(70): ({}, {}, {})\n", ps[70].eforce.x, ps[70].eforce.y, ps[70].eforce.z);
-  std::print("\x1b[0GVelocity(70): ({}, {}, {})\n", ps[70].vel.x, ps[70].vel.y, ps[70].vel.z);
+  std::print("\x1b[1J\x1b[1;1H"); // Clear from cursor to start of screen + move cursor to top-left.
+  std::print("\x1b[0GDensity(544): {}\n", ps[544].density);
+  std::print("\x1b[0GPressure(544): {}\n", ps[544].pressure);
+  std::print("\x1b[0GPressure Force(544): ({}, {}, {})\n", ps[544].pforce.x, ps[544].pforce.y, ps[544].pforce.z);
+  std::print("\x1b[0GViscosity Force(544): ({}, {}, {})\n", ps[544].vforce.x, ps[544].vforce.y, ps[544].vforce.z);
+  std::print("\x1b[0GExternal Force(544): ({}, {}, {})\n", ps[544].eforce.x, ps[544].eforce.y, ps[544].eforce.z);
+  std::print("\x1b[0GVelocity(544): ({}, {}, {})\n", ps[544].vel.x, ps[544].vel.y, ps[544].vel.z);
 
   return libcommon::update(ctx);
 }
@@ -153,6 +153,7 @@ libcommon::SDLCtx *run_loop(libcommon::SDLCtx *ctx) {
 
   int count = 0;
   bool run = true;
+  std::print("\x1b[2J"); // Clear screen (println until clear)
   while (run) {
     run = ::update(ctx);
     ::draw(ctx);
