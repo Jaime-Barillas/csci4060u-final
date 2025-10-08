@@ -69,27 +69,25 @@ bool update(libcommon::SDLCtx *ctx) {
     p.pressure = particles::GAS_CONSTANT * (p.density - particles::REST_DENSITY);
   }
 
-  // 3. Pressure forces.
-  // FIXME: Something is wrong with the calculation.
-  //        Particles tend to get 'sucked' into each other.
   particles::Vec3 pressure_kernel_temp;
+  float viscosity_kernel_temp;
   for (auto &p : ps) {
+
     particles::Vec3 pressure_temp = { 0, 0, 0 };
+    particles::Vec3 viscosity_temp = { 0, 0, 0 };
+
     for (auto &neighbour : ps) {
+
+      // 3. Pressure forces.
+      // FIXME: Something is wrong with the calculation.
+      //        Particles tend to get 'sucked' into each other.
       pressure_kernel_temp = particles::kernel<particles::SpikyGradKernel>(p.pos, neighbour.pos);
       float pressure_factor = (p.pressure + neighbour.pressure) / (2 * neighbour.density);
       pressure_temp.x += pressure_kernel_temp.x * pressure_factor;
       pressure_temp.y += pressure_kernel_temp.y * pressure_factor;
       pressure_temp.z += pressure_kernel_temp.z * pressure_factor;
-    }
-    p.pforce = pressure_temp;
-  }
 
-  // 4. Viscosity forces.
-  float viscosity_kernel_temp;
-  for (auto &p : ps) {
-    particles::Vec3 viscosity_temp = { 0, 0, 0 };
-    for (auto &neighbour : ps) {
+      // 4. Viscosity forces.
       viscosity_kernel_temp = particles::kernel<particles::ViscLaplKernel>(p.pos, neighbour.pos);
       float viscosity_factor_x = (neighbour.vel.x - p.vel.x) / neighbour.density;
       float viscosity_factor_y = (neighbour.vel.y - p.vel.y) / neighbour.density;
@@ -98,11 +96,11 @@ bool update(libcommon::SDLCtx *ctx) {
       viscosity_temp.y += particles::VISCOSITY_CONSTANT * viscosity_kernel_temp * viscosity_factor_y;
       viscosity_temp.z += particles::VISCOSITY_CONSTANT * viscosity_kernel_temp * viscosity_factor_z;
     }
-    p.vforce = viscosity_temp;
-  }
 
-  // 5. External forces.
-  for (auto &p : ps) {
+    p.pforce = pressure_temp;
+    p.vforce = viscosity_temp;
+
+    // 5. External forces.
     /*
     p.eforce = p.pos.normalized();
     p.eforce.negate();
