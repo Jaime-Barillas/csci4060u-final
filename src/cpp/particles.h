@@ -27,18 +27,18 @@ namespace particles {
 
   static_assert(std::is_standard_layout_v<Vec3>, "particles::Vec3 must have standard layout");
 
-  struct Particle {
-    Vec3 pos;
-    Vec3 vel;
-    Vec3 pforce; // Pressure forces
-    Vec3 vforce; // Viscosity forces
-    Vec3 eforce; // External forces
-    float density;
-    float pressure;
+  struct Particles {
+    std::vector<Vec3> pos;
+    std::vector<Vec3> vel;
+    std::vector<Vec3> pforce; // Pressure forces
+    std::vector<Vec3> vforce; // Viscosity forces
+    std::vector<Vec3> eforce; // External forces
+    std::vector<float> density;
+    std::vector<float> pressure;
   };
 
   void reset(
-    std::vector<Particle> &particles,
+    Particles &particles,
     uint32_t count,
     float left_bound,
     float right_bound

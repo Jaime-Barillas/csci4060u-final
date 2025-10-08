@@ -1,5 +1,4 @@
 #include "particles.h"
-#include <algorithm>
 #include <cstdint>
 #include <filesystem>
 #include <lib.h>
@@ -21,7 +20,7 @@ constexpr float LOWER_BOUND = -1.0;
 constexpr float UPPER_BOUND = 1.0;
 constexpr float BACKWARD_BOUND = -1.0;
 constexpr float FORWARD_BOUND = 1.0;
-std::vector<particles::Particle> ps;
+particles::Particles ps;
 float degrees = 0;
 uint64_t frame_counter = 1;
 float gravity_dir = -1;
@@ -35,16 +34,16 @@ bool copy_particles(libcommon::SDLCtx *ctx, SDL_GPUTransferBuffer *tbuf, const v
     return false;
   }
 
-  const std::vector<particles::Particle> *ps = static_cast<const std::vector<particles::Particle>*>(particles_obj);
+  const particles::Particles *ps = static_cast<const particles::Particles*>(particles_obj);
 
   float *mapping = static_cast<float*>(SDL_MapGPUTransferBuffer(ctx->device, ctx->bufs.point_sprites.t, true));
   if (!mapping) {
     return false;
   }
-  for (int i = 0; i < ps->size(); i++) {
-    mapping[(i * 4) + 0] = ps->at(i).pos.x;
-    mapping[(i * 4) + 1] = ps->at(i).pos.y;
-    mapping[(i * 4) + 2] = ps->at(i).pos.z;
+  for (int i = 0; i < ps->pos.size(); i++) {
+    mapping[(i * 4) + 0] = ps->pos.at(i).x;
+    mapping[(i * 4) + 1] = ps->pos.at(i).y;
+    mapping[(i * 4) + 2] = ps->pos.at(i).z;
     mapping[(i * 4) + 3] = 1;
   }
   SDL_UnmapGPUTransferBuffer(ctx->device, ctx->bufs.point_sprites.t);
@@ -60,85 +59,87 @@ bool update(libcommon::SDLCtx *ctx) {
                                              * libcommon::matrix::rotation_y(degrees);
 
   // 2. Density + Pressure value.
-  for (auto &p : ps) {
-    p.density = 0.0;
-    p.pressure = 0.0;
-    for (auto &neighbour : ps) {
-      p.density += particles::kernel<particles::PolyKernel>(p.pos, neighbour.pos);
+  for (size_t i = 0; i < ps.pos.size(); i++) {
+    ps.density[i] = 0.0;
+    ps.pressure[i] = 0.0;
+    for (size_t j = 0; j < ps.pos.size(); j++) {
+      ps.density[i] += particles::kernel<particles::PolyKernel>(ps.pos[i], ps.pos[j]);
     }
-    p.pressure = particles::GAS_CONSTANT * (p.density - particles::REST_DENSITY);
+    ps.pressure[i] = particles::GAS_CONSTANT * (ps.density[i] - particles::REST_DENSITY);
   }
 
+  // 3. Pressure forces.
+  // FIXME: Something is wrong with the calculation.
+  //        Particles tend to get 'sucked' into each other.
   particles::Vec3 pressure_kernel_temp;
-  float viscosity_kernel_temp;
-  for (auto &p : ps) {
-
+  for (size_t i = 0; i < ps.pos.size(); i++) {
     particles::Vec3 pressure_temp = { 0, 0, 0 };
-    particles::Vec3 viscosity_temp = { 0, 0, 0 };
-
-    for (auto &neighbour : ps) {
-
-      // 3. Pressure forces.
-      // FIXME: Something is wrong with the calculation.
-      //        Particles tend to get 'sucked' into each other.
-      pressure_kernel_temp = particles::kernel<particles::SpikyGradKernel>(p.pos, neighbour.pos);
-      float pressure_factor = (p.pressure + neighbour.pressure) / (2 * neighbour.density);
+    for (size_t j = 0; j < ps.pos.size(); j++) {
+      pressure_kernel_temp = particles::kernel<particles::SpikyGradKernel>(ps.pos[i], ps.pos[j]);
+      float pressure_factor = (ps.pressure[i] + ps.pressure[j]) / (2 * ps.density[j]);
       pressure_temp.x += pressure_kernel_temp.x * pressure_factor;
       pressure_temp.y += pressure_kernel_temp.y * pressure_factor;
       pressure_temp.z += pressure_kernel_temp.z * pressure_factor;
+    }
+    ps.pforce[i] = pressure_temp;
+  }
 
-      // 4. Viscosity forces.
-      viscosity_kernel_temp = particles::kernel<particles::ViscLaplKernel>(p.pos, neighbour.pos);
-      float viscosity_factor_x = (neighbour.vel.x - p.vel.x) / neighbour.density;
-      float viscosity_factor_y = (neighbour.vel.y - p.vel.y) / neighbour.density;
-      float viscosity_factor_z = (neighbour.vel.z - p.vel.z) / neighbour.density;
+  // 4. Viscosity forces.
+  float viscosity_kernel_temp;
+  for (size_t i = 0; i < ps.pos.size(); i++) {
+    particles::Vec3 viscosity_temp = { 0, 0, 0 };
+    for (size_t j = 0; j < ps.pos.size(); j++) {
+      viscosity_kernel_temp = particles::kernel<particles::ViscLaplKernel>(ps.pos[i], ps.pos[j]);
+      float viscosity_factor_x = (ps.vel[j].x - ps.vel[i].x) / ps.density[j];
+      float viscosity_factor_y = (ps.vel[j].y - ps.vel[i].y) / ps.density[j];
+      float viscosity_factor_z = (ps.vel[j].z - ps.vel[i].z) / ps.density[j];
       viscosity_temp.x += particles::VISCOSITY_CONSTANT * viscosity_kernel_temp * viscosity_factor_x;
       viscosity_temp.y += particles::VISCOSITY_CONSTANT * viscosity_kernel_temp * viscosity_factor_y;
       viscosity_temp.z += particles::VISCOSITY_CONSTANT * viscosity_kernel_temp * viscosity_factor_z;
     }
+    ps.vforce[i] = viscosity_temp;
+  }
 
-    p.pforce = pressure_temp;
-    p.vforce = viscosity_temp;
-
-    // 5. External forces.
+  // 5. External forces.
+  for (size_t i = 0; i < ps.pos.size(); i++) {
     /*
-    p.eforce = p.pos.normalized();
-    p.eforce.negate();
-    p.eforce *= particles::GRAVITY_STRENGTH;
+    ps.eforce[i] = ps.pos[i].normalized();
+    ps.eforce[i].negate();
+    ps.eforce[i] *= particles::GRAVITY_STRENGTH;
     */
-    p.eforce = { 0, particles::GRAVITY_STRENGTH * gravity_dir, 0 };
+    ps.eforce[i] = { 0, particles::GRAVITY_STRENGTH * gravity_dir, 0 };
   }
 
   // 6. Integrate.
   particles::Vec3 acceleration;
-  for (auto &p : ps) {
+  for (size_t i = 0; i < ps.pos.size(); i++) {
     // F = ma <=> a = F/m, m = 1.0 => a = F
-    acceleration.x = p.pforce.x + p.vforce.x + p.eforce.x;
-    acceleration.y = p.pforce.y + p.vforce.y + p.eforce.y;
-    acceleration.z = p.pforce.z + p.vforce.z + p.eforce.z;
+    acceleration.x = ps.pforce[i].x + ps.vforce[i].x + ps.eforce[i].x;
+    acceleration.y = ps.pforce[i].y + ps.vforce[i].y + ps.eforce[i].y;
+    acceleration.z = ps.pforce[i].z + ps.vforce[i].z + ps.eforce[i].z;
 
     // v = a * dt;
-    p.vel.x = acceleration.x * (1.0f / 60); // FIXME: actually use delta time.
-    p.vel.y = acceleration.y * (1.0f / 60);
-    p.vel.z = acceleration.z * (1.0f / 60);
+    ps.vel[i].x = acceleration.x * (1.0f / 60); // FIXME: actually use delta time.
+    ps.vel[i].y = acceleration.y * (1.0f / 60);
+    ps.vel[i].z = acceleration.z * (1.0f / 60);
 
     // d = v * dt;
-    p.pos.x += p.vel.x * (1.0f / 60);
-    p.pos.y += p.vel.y * (1.0f / 60);
-    p.pos.z += p.vel.z * (1.0f / 60);
+    ps.pos[i].x += ps.vel[i].x * (1.0f / 60);
+    ps.pos[i].y += ps.vel[i].y * (1.0f / 60);
+    ps.pos[i].z += ps.vel[i].z * (1.0f / 60);
 
     // Boundary conditions.
-    if (p.pos.x < LEFT_BOUND || p.pos.x > RIGHT_BOUND) {
-      p.pos.x = std::clamp<float>(p.pos.x, LEFT_BOUND, RIGHT_BOUND);
-      p.vel.x *= -0.5;
+    if (ps.pos[i].x < LEFT_BOUND || ps.pos[i].x > RIGHT_BOUND) {
+      ps.pos[i].x = std::clamp<float>(ps.pos[i].x, LEFT_BOUND, RIGHT_BOUND);
+      ps.vel[i].x *= -0.5;
     }
-    if (p.pos.y < LOWER_BOUND || p.pos.y > UPPER_BOUND) {
-      p.pos.y = std::clamp<float>(p.pos.y, LOWER_BOUND, UPPER_BOUND);
-      p.vel.y *= -0.5;
+    if (ps.pos[i].y < LOWER_BOUND || ps.pos[i].y > UPPER_BOUND) {
+      ps.pos[i].y = std::clamp<float>(ps.pos[i].y, LOWER_BOUND, UPPER_BOUND);
+      ps.vel[i].y *= -0.5;
     }
-    if (p.pos.z < BACKWARD_BOUND || p.pos.z > FORWARD_BOUND) {
-      p.pos.z = std::clamp<float>(p.pos.z, BACKWARD_BOUND, FORWARD_BOUND);
-      p.vel.z *= -0.5;
+    if (ps.pos[i].z < BACKWARD_BOUND || ps.pos[i].z > FORWARD_BOUND) {
+      ps.pos[i].z = std::clamp<float>(ps.pos[i].z, BACKWARD_BOUND, FORWARD_BOUND);
+      ps.vel[i].z *= -0.5;
     }
   }
 
@@ -148,12 +149,12 @@ bool update(libcommon::SDLCtx *ctx) {
 
   if (!bench_mode) {
     std::print("\x1b[1J\x1b[1;1H"); // Clear from cursor to start of screen + move cursor to top-left.
-    std::print("\x1b[0GDensity(544): {}\n", ps[544].density);
-    std::print("\x1b[0GPressure(544): {}\n", ps[544].pressure);
-    std::print("\x1b[0GPressure Force(544): ({}, {}, {})\n", ps[544].pforce.x, ps[544].pforce.y, ps[544].pforce.z);
-    std::print("\x1b[0GViscosity Force(544): ({}, {}, {})\n", ps[544].vforce.x, ps[544].vforce.y, ps[544].vforce.z);
-    std::print("\x1b[0GExternal Force(544): ({}, {}, {})\n", ps[544].eforce.x, ps[544].eforce.y, ps[544].eforce.z);
-    std::print("\x1b[0GVelocity(544): ({}, {}, {})\n", ps[544].vel.x, ps[544].vel.y, ps[544].vel.z);
+    std::print("\x1b[0GDensity(544): {}\n", ps.density[544]);
+    std::print("\x1b[0GPressure(544): {}\n", ps.pressure[544]);
+    std::print("\x1b[0GPressure Force(544): ({}, {}, {})\n", ps.pforce[544].x, ps.pforce[544].y, ps.pforce[544].z);
+    std::print("\x1b[0GViscosity Force(544): ({}, {}, {})\n", ps.vforce[544].x, ps.vforce[544].y, ps.vforce[544].z);
+    std::print("\x1b[0GExternal Force(544): ({}, {}, {})\n", ps.eforce[544].x, ps.eforce[544].y, ps.eforce[544].z);
+    std::print("\x1b[0GVelocity(544): ({}, {}, {})\n", ps.vel[544].x, ps.vel[544].y, ps.vel[544].z);
 
     float size = (frame_counter < BENCH_LENGTH) ? frame_counter : frame_times.size();
     float avg = std::reduce(frame_times.begin(), frame_times.end()) / size;

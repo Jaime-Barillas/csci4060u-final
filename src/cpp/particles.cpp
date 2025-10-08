@@ -25,7 +25,7 @@ namespace particles {
   }
 
   void reset(
-    std::vector<Particle> &particles,
+    Particles &particles,
     uint32_t count,
     float left_bound,
     float right_bound
@@ -34,22 +34,29 @@ namespace particles {
     float step = (right_bound - left_bound) * USABLE_SPACE_MODIFIER / length;
     float start = (-step * length) / 2.0f;
 
-    particles.resize(count);
+    particles.pos.resize(count);
+    particles.vel.resize(count);
+    particles.pforce.resize(count);
+    particles.vforce.resize(count);
+    particles.eforce.resize(count);
+    particles.density.resize(count);
+    particles.pressure.resize(count);
+
     for (uint32_t i : std::views::iota(0u, count)) {
       uint32_t x = i % length;
       uint32_t y = (i / length) % length;
       uint32_t z = i / (length * length);
-      particles[i].pos = {
+      particles.pos[i] = {
         .x = start + (x * step),
         .y = start + (y * step),
         .z = start + (z * step),
       };
-      particles[i].vel = {.x = 0, .y = 0, .z = 0};
-      particles[i].pforce = {.x = 0, .y = 0, .z = 0};
-      particles[i].vforce = {.x = 0, .y = 0, .z = 0};
-      particles[i].eforce = {.x = 0, .y = 0, .z = 0};
-      particles[i].density = 0;
-      particles[i].pressure = 0;
+      particles.vel[i] = {.x = 0, .y = 0, .z = 0};
+      particles.pforce[i] = {.x = 0, .y = 0, .z = 0};
+      particles.vforce[i] = {.x = 0, .y = 0, .z = 0};
+      particles.eforce[i] = {.x = 0, .y = 0, .z = 0};
+      particles.density[i] = 0;
+      particles.pressure[i] = 0;
     }
   }
 
