@@ -19,6 +19,8 @@ constexpr float BACKWARD_BOUND = -1.0;
 constexpr float FORWARD_BOUND = 1.0;
 std::vector<particles::Particle> ps;
 float degrees = 0;
+uint64_t frame_counter = 0;
+float gravity_dir = -1;
 
 bool copy_particles(libcommon::SDLCtx *ctx, SDL_GPUTransferBuffer *tbuf, const void *particles_obj) {
   if (!particles_obj) {
@@ -93,9 +95,12 @@ bool update(libcommon::SDLCtx *ctx) {
 
   // 5. External forces.
   for (auto &p : ps) {
+    /*
     p.eforce = p.pos.normalized();
     p.eforce.negate();
     p.eforce *= particles::GRAVITY_STRENGTH;
+    */
+    p.eforce = { 0, particles::GRAVITY_STRENGTH * gravity_dir, 0 };
   }
 
   // 6. Integrate.
@@ -129,6 +134,11 @@ bool update(libcommon::SDLCtx *ctx) {
       p.pos.z = std::clamp<float>(p.pos.z, BACKWARD_BOUND, FORWARD_BOUND);
       p.vel.z *= -0.5;
     }
+  }
+
+  frame_counter += 1;
+  if (frame_counter % 300 == 0) {
+    gravity_dir = -gravity_dir;
   }
 
   std::print("\x1b[1J\x1b[1;1H"); // Clear from cursor to start of screen + move cursor to top-left.
