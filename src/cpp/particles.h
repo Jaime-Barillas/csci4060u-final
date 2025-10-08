@@ -7,6 +7,7 @@
 
 namespace particles {
   constexpr float USABLE_SPACE_MODIFIER = 0.8f;
+  constexpr float PARTICLE_RADIUS = 0.1f;
   constexpr float SUPPORT = 0.33f;
   constexpr float GAS_CONSTANT = 1.0f;
   constexpr float REST_DENSITY = 125.0f;

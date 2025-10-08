@@ -56,8 +56,15 @@ namespace libcommon {
     } textures;
 
     const char *exe_dir = "";
-    matrix::Mat4 model_view;
-    matrix::Mat4 projection;
+    struct {
+      struct {
+        matrix::Mat4 model_view;
+        float particle_radius;
+      } gen_point_sprites;
+      struct {
+        matrix::Mat4 projection;
+      } pass1;
+    } uniforms;
     uint32_t window_width = 0;
     uint32_t window_height = 0;
     uint32_t particle_count = 0;

@@ -18,13 +18,13 @@ layout(std430, set = 1, binding = 1) buffer TexCoordBuffer {
 
 layout(std140, set = 2, binding = 0) uniform TransformBuffer {
     mat4 view_model;
+    float particle_radius;
+    float pad01;
+    float pad02;
+    float pad03;
 };
 
 const uint VERTICES_PER_QUAD = 6;
-const vec4 VERT_BL_OFFSET = vec4(-0.1, -0.1, 0.0, 0.0);
-const vec4 VERT_TL_OFFSET = vec4(-0.1,  0.1, 0.0, 0.0);
-const vec4 VERT_TR_OFFSET = vec4( 0.1,  0.1, 0.0, 0.0);
-const vec4 VERT_BR_OFFSET = vec4( 0.1, -0.1, 0.0, 0.0);
 
 const vec2 TEX_COORD_TL = vec2(0.0, 0.0);
 const vec2 TEX_COORD_TR = vec2(1.0, 0.0);
@@ -32,6 +32,11 @@ const vec2 TEX_COORD_BL = vec2(0.0, 1.0);
 const vec2 TEX_COORD_BR = vec2(1.0, 1.0);
 
 void main() {
+    const vec4 VERT_BL_OFFSET = vec4(-particle_radius, -particle_radius, 0.0, 0.0);
+    const vec4 VERT_TL_OFFSET = vec4(-particle_radius,  particle_radius, 0.0, 0.0);
+    const vec4 VERT_TR_OFFSET = vec4( particle_radius,  particle_radius, 0.0, 0.0);
+    const vec4 VERT_BR_OFFSET = vec4( particle_radius, -particle_radius, 0.0, 0.0);
+
     uint particle_idx = gl_GlobalInvocationID.x;
     uint vertex_base = particle_idx * VERTICES_PER_QUAD;
 

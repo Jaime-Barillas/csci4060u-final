@@ -47,9 +47,9 @@ bool copy_particles(libcommon::SDLCtx *ctx, SDL_GPUTransferBuffer *tbuf, const v
 bool update(libcommon::SDLCtx *ctx) {
   // 1. Model View matrix.
   // degrees += 0.02f;
-  ctx->model_view = libcommon::matrix::translate_z(2.0f)
-                  // * libcommon::matrix::rotation_x(-20)
-                  * libcommon::matrix::rotation_y(degrees);
+  ctx->uniforms.gen_point_sprites.model_view = libcommon::matrix::translate_z(2.0f)
+                                             // * libcommon::matrix::rotation_x(-20)
+                                             * libcommon::matrix::rotation_y(degrees);
 
   // 2. Density + Pressure value.
   for (auto &p : ps) {
@@ -164,6 +164,7 @@ libcommon::SDLCtx *run_loop(libcommon::SDLCtx *ctx) {
 
   int count = 0;
   bool run = true;
+  ctx->uniforms.gen_point_sprites.particle_radius = particles::PARTICLE_RADIUS;
   std::print("\x1b[2J"); // Clear screen (println until clear)
   while (run) {
     run = ::update(ctx);

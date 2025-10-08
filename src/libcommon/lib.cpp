@@ -66,7 +66,7 @@ namespace libcommon {
     //       x-axis (-1 to 1) is larger than the extent of the z-axis (0 to
     //       1) in NDC. When rotating, it could cause vertices to fall outside
     //       the clipping range.
-    ctx->projection = matrix::perspective(100, aspect_ratio, 0.5, 3.5);
+    ctx->uniforms.pass1.projection = matrix::perspective(100, aspect_ratio, 0.5, 3.5);
 
     ctx->window = SDL_CreateWindow("fluid-sim-sph", bounds.w, bounds.h, 0);
     if (!ctx->window) {
@@ -522,7 +522,7 @@ namespace libcommon {
       );
       SDL_BindGPUComputePipeline(gen_point_sprites_pass, ctx->pipelines.gen_point_sprites);
       SDL_BindGPUComputeStorageBuffers(gen_point_sprites_pass, 0, &(ctx->bufs.point_sprites.b), 1);
-      SDL_PushGPUComputeUniformData(cmds, 0, &(ctx->model_view), sizeof(matrix::Mat4));
+      SDL_PushGPUComputeUniformData(cmds, 0, &(ctx->uniforms.gen_point_sprites), sizeof(ctx->uniforms.gen_point_sprites));
       // NOTE: Hard-coded workgroup size of 64 in the x dimension.
       SDL_DispatchGPUCompute(gen_point_sprites_pass, ctx->particle_count / 64, 1, 1);
       SDL_EndGPUComputePass(gen_point_sprites_pass);
@@ -558,7 +558,7 @@ namespace libcommon {
       SDL_GPURenderPass *render_pass = SDL_BeginGPURenderPass(cmds, &cti, 1, &dsti);
       SDL_BindGPUGraphicsPipeline(render_pass, ctx->pipelines.pass1);
       SDL_BindGPUVertexBuffers(render_pass, 0, vertex_buffer_bindings, 2);
-      SDL_PushGPUVertexUniformData(cmds, 0, &(ctx->projection), sizeof(matrix::Mat4));
+      SDL_PushGPUVertexUniformData(cmds, 0, &(ctx->uniforms.pass1), sizeof(ctx->uniforms.pass1));
       SDL_DrawGPUPrimitives(render_pass, num_vertices, 1, 0, 0);
       SDL_EndGPURenderPass(render_pass);
     }
