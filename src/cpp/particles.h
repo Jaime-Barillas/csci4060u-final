@@ -2,6 +2,7 @@
 
 #include <concepts>
 #include <cstdint>
+#include <type_traits>
 #include <vector>
 
 namespace particles {
@@ -10,12 +11,20 @@ namespace particles {
   constexpr float GAS_CONSTANT = 1.0f;
   constexpr float REST_DENSITY = 125.0f;
   constexpr float VISCOSITY_CONSTANT = 0.01f;
+  constexpr float GRAVITY_STRENGTH = 10.0f;
 
   struct Vec3 {
     float x;
     float y;
     float z;
+
+    Vec3 normalized();
+
+    void negate();
+    void operator*=(float scalar);
   };
+
+  static_assert(std::is_standard_layout_v<Vec3>, "particles::Vec3 must have standard layout");
 
   struct Particle {
     Vec3 pos;

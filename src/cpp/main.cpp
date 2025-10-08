@@ -92,9 +92,10 @@ bool update(libcommon::SDLCtx *ctx) {
   }
 
   // 5. External forces.
-  // TODO
   for (auto &p : ps) {
-    p.eforce = { 0, 0, 0 };
+    p.eforce = p.pos.normalized();
+    p.eforce.negate();
+    p.eforce *= particles::GRAVITY_STRENGTH;
   }
 
   // 6. Integrate.

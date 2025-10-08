@@ -7,6 +7,23 @@
 #include <vector>
 
 namespace particles {
+  Vec3 Vec3::normalized() {
+    float length = std::sqrt((x * x) + (y * y) + (z * z));
+    return { x / length, y / length, z / length};
+  }
+
+  void Vec3::negate() {
+    x = -x;
+    y = -y;
+    z = -z;
+  }
+
+  void Vec3::operator*=(float scalar) {
+    x *= scalar;
+    y *= scalar;
+    z *= scalar;
+  }
+
   void reset(
     std::vector<Particle> &particles,
     uint32_t count,
