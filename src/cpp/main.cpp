@@ -1,15 +1,19 @@
 #include "particles.h"
 #include <algorithm>
+#include <cstdint>
 #include <filesystem>
 #include <lib.h>
 #include <matrix.h>
+#include <numeric>
 #include <print>
 #include <SDL3/SDL_gpu.h>
 #include <SDL3/SDL_stdinc.h>
+#include <SDL3/SDL_timer.h>
 #include <unistd.h>
 #include <vector>
 
 
+constexpr uint32_t BENCH_LENGTH = 300; // frames
 constexpr uint32_t PARTICLE_COUNT = 1024;
 constexpr float LEFT_BOUND = -1.0;
 constexpr float RIGHT_BOUND = 1.0;
@@ -19,8 +23,12 @@ constexpr float BACKWARD_BOUND = -1.0;
 constexpr float FORWARD_BOUND = 1.0;
 std::vector<particles::Particle> ps;
 float degrees = 0;
-uint64_t frame_counter = 0;
+uint64_t frame_counter = 1;
 float gravity_dir = -1;
+
+bool bench_mode = false;
+uint64_t frame_index = 0;
+std::vector<float> frame_times(BENCH_LENGTH);
 
 bool copy_particles(libcommon::SDLCtx *ctx, SDL_GPUTransferBuffer *tbuf, const void *particles_obj) {
   if (!particles_obj) {
@@ -136,18 +144,23 @@ bool update(libcommon::SDLCtx *ctx) {
     }
   }
 
-  frame_counter += 1;
   if (frame_counter % 300 == 0) {
     gravity_dir = -gravity_dir;
   }
 
-  std::print("\x1b[1J\x1b[1;1H"); // Clear from cursor to start of screen + move cursor to top-left.
-  std::print("\x1b[0GDensity(544): {}\n", ps[544].density);
-  std::print("\x1b[0GPressure(544): {}\n", ps[544].pressure);
-  std::print("\x1b[0GPressure Force(544): ({}, {}, {})\n", ps[544].pforce.x, ps[544].pforce.y, ps[544].pforce.z);
-  std::print("\x1b[0GViscosity Force(544): ({}, {}, {})\n", ps[544].vforce.x, ps[544].vforce.y, ps[544].vforce.z);
-  std::print("\x1b[0GExternal Force(544): ({}, {}, {})\n", ps[544].eforce.x, ps[544].eforce.y, ps[544].eforce.z);
-  std::print("\x1b[0GVelocity(544): ({}, {}, {})\n", ps[544].vel.x, ps[544].vel.y, ps[544].vel.z);
+  if (!bench_mode) {
+    std::print("\x1b[1J\x1b[1;1H"); // Clear from cursor to start of screen + move cursor to top-left.
+    std::print("\x1b[0GDensity(544): {}\n", ps[544].density);
+    std::print("\x1b[0GPressure(544): {}\n", ps[544].pressure);
+    std::print("\x1b[0GPressure Force(544): ({}, {}, {})\n", ps[544].pforce.x, ps[544].pforce.y, ps[544].pforce.z);
+    std::print("\x1b[0GViscosity Force(544): ({}, {}, {})\n", ps[544].vforce.x, ps[544].vforce.y, ps[544].vforce.z);
+    std::print("\x1b[0GExternal Force(544): ({}, {}, {})\n", ps[544].eforce.x, ps[544].eforce.y, ps[544].eforce.z);
+    std::print("\x1b[0GVelocity(544): ({}, {}, {})\n", ps[544].vel.x, ps[544].vel.y, ps[544].vel.z);
+
+    float size = (frame_counter < BENCH_LENGTH) ? frame_counter : frame_times.size();
+    float avg = std::reduce(frame_times.begin(), frame_times.end()) / size;
+    std::print("\n\x1b[0GAverage Frame Time: {}s\n", avg);
+  }
 
   return libcommon::update(ctx);
 }
@@ -157,22 +170,33 @@ void draw(libcommon::SDLCtx *ctx) {
 }
 
 libcommon::SDLCtx *run_loop(libcommon::SDLCtx *ctx) {
-  libcommon::SDLError err{ .ctx = ctx, .type = libcommon::SDLErrorType::None };
-  std::println("{}", err);
+  if (!bench_mode) {
+    libcommon::SDLError err{ .ctx = ctx, .type = libcommon::SDLErrorType::None };
+    std::println("{}", err);
+    std::print("\x1b[2J"); // Clear screen (println until clear)
+  }
 
+  ctx->uniforms.gen_point_sprites.particle_radius = particles::PARTICLE_RADIUS;
   particles::reset(ps, PARTICLE_COUNT, LEFT_BOUND, RIGHT_BOUND);
 
-  int count = 0;
   bool run = true;
-  ctx->uniforms.gen_point_sprites.particle_radius = particles::PARTICLE_RADIUS;
-  std::print("\x1b[2J"); // Clear screen (println until clear)
+  uint64_t update_start = 0;
+  uint64_t update_time = 0;
   while (run) {
+
+    update_start = SDL_GetPerformanceCounter();
     run = ::update(ctx);
+    update_time = SDL_GetPerformanceCounter() - update_start;
+    frame_times[frame_index % BENCH_LENGTH] = static_cast<float>(update_time) / SDL_GetPerformanceFrequency();
+
     ::draw(ctx);
 
-    // Run longer than one frame to see non-zero values.
-    // count++;
-    // run = (count == 1) ? false : run;
+    if (bench_mode && frame_counter == BENCH_LENGTH) {
+      run = false;
+    }
+
+    frame_counter += 1;
+    frame_index += 1;
   }
 
   return ctx;
@@ -181,6 +205,10 @@ libcommon::SDLCtx *run_loop(libcommon::SDLCtx *ctx) {
 int main(int argc, const char **argv) {
   std::filesystem::path exe_path(argv[0]);
 
+  if (argc >= 2 && std::string_view(argv[1]) == "--bench") {
+    bench_mode = true;
+  }
+
   auto ctx = libcommon::initialize_and_setup(exe_path.parent_path().c_str(), PARTICLE_COUNT)
     .transform(run_loop)
     .transform(libcommon::teardown);
@@ -188,6 +216,9 @@ int main(int argc, const char **argv) {
   if (!ctx) {
     std::println("{}", ctx.error());
     return 1;
+  } else if (bench_mode) {
+    float avg = std::reduce(frame_times.begin(), frame_times.end()) / frame_times.size();
+    std::println("{}", avg);
   }
 
   return 0;
