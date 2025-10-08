@@ -9,7 +9,7 @@ namespace particles {
   constexpr float SUPPORT = 0.33f;
   constexpr float GAS_CONSTANT = 1.0f;
   constexpr float REST_DENSITY = 125.0f;
-  constexpr float VISCOSITY_CONSTANT = 0.0f;
+  constexpr float VISCOSITY_CONSTANT = 0.01f;
 
   struct Vec3 {
     float x;
@@ -36,7 +36,7 @@ namespace particles {
 
   struct PolyKernel      { using return_type = float; };
   struct SpikyGradKernel { using return_type = Vec3; };
-  struct ViscLaplKernel  { using return_type = Vec3; };
+  struct ViscLaplKernel  { using return_type = float; };
 
   template<typename T>
   concept Kernel = std::same_as<T, PolyKernel> ||

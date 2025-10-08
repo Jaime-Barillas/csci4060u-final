@@ -76,7 +76,7 @@ bool update(libcommon::SDLCtx *ctx) {
   }
 
   // 4. Viscosity forces.
-  particles::Vec3 viscosity_kernel_temp;
+  float viscosity_kernel_temp;
   for (auto &p : ps) {
     particles::Vec3 viscosity_temp = { 0, 0, 0 };
     for (auto &neighbour : ps) {
@@ -84,9 +84,9 @@ bool update(libcommon::SDLCtx *ctx) {
       float viscosity_factor_x = (neighbour.vel.x - p.vel.x) / neighbour.density;
       float viscosity_factor_y = (neighbour.vel.y - p.vel.y) / neighbour.density;
       float viscosity_factor_z = (neighbour.vel.z - p.vel.z) / neighbour.density;
-      viscosity_temp.x += particles::VISCOSITY_CONSTANT * viscosity_kernel_temp.x * viscosity_factor_x;
-      viscosity_temp.y += particles::VISCOSITY_CONSTANT * viscosity_kernel_temp.y * viscosity_factor_y;
-      viscosity_temp.z += particles::VISCOSITY_CONSTANT * viscosity_kernel_temp.z * viscosity_factor_z;
+      viscosity_temp.x += particles::VISCOSITY_CONSTANT * viscosity_kernel_temp * viscosity_factor_x;
+      viscosity_temp.y += particles::VISCOSITY_CONSTANT * viscosity_kernel_temp * viscosity_factor_y;
+      viscosity_temp.z += particles::VISCOSITY_CONSTANT * viscosity_kernel_temp * viscosity_factor_z;
     }
     p.vforce = viscosity_temp;
   }
