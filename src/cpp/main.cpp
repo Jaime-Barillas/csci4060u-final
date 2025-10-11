@@ -53,7 +53,7 @@ bool copy_particles(libcommon::SDLCtx *ctx, SDL_GPUTransferBuffer *tbuf, const v
 
 bool update(libcommon::SDLCtx *ctx) {
   // 1. Model View matrix.
-  // degrees += 0.02f;
+  degrees += 0.025f;
   ctx->uniforms.gen_point_sprites.model_view = libcommon::matrix::translate_z(2.0f)
                                              // * libcommon::matrix::rotation_x(-20)
                                              * libcommon::matrix::rotation_y(degrees);
