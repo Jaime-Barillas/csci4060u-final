@@ -1,5 +1,6 @@
 #include "particles.h"
 #include <cstdint>
+#include <cstdlib>
 #include <filesystem>
 #include <lib.h>
 #include <matrix.h>
@@ -14,6 +15,8 @@
 
 constexpr uint32_t BENCH_LENGTH = 300; // frames
 constexpr uint32_t PARTICLE_COUNT = 1024;
+constexpr float FOUNTAIN_WIDTH = 0.25;
+constexpr float FOUNTAIN_STRENGTH = 1.5;
 constexpr float LEFT_BOUND = -1.0;
 constexpr float RIGHT_BOUND = 1.0;
 constexpr float LOWER_BOUND = -1.0;
@@ -23,7 +26,6 @@ constexpr float FORWARD_BOUND = 1.0;
 particles::Particles ps;
 float degrees = 0;
 uint64_t frame_counter = 1;
-float gravity_dir = -1;
 
 bool bench_mode = false;
 uint64_t frame_index = 0;
@@ -55,7 +57,7 @@ bool update(libcommon::SDLCtx *ctx) {
   // 1. Model View matrix.
   degrees += 0.025f;
   ctx->uniforms.gen_point_sprites.model_view = libcommon::matrix::translate_z(2.0f)
-                                             // * libcommon::matrix::rotation_x(-20)
+                                             * libcommon::matrix::rotation_x(-20)
                                              * libcommon::matrix::rotation_y(degrees);
 
   // 2. Density + Pressure value.
@@ -107,7 +109,13 @@ bool update(libcommon::SDLCtx *ctx) {
     ps.eforce[i].negate();
     ps.eforce[i] *= particles::GRAVITY_STRENGTH;
     */
-    ps.eforce[i] = { 0, particles::GRAVITY_STRENGTH * gravity_dir, 0 };
+    bool flow_up = ps.pos[i].y < 0
+                 && std::abs(ps.pos[i].x) < FOUNTAIN_WIDTH
+                 && std::abs(ps.pos[i].z) < FOUNTAIN_WIDTH;
+    ps.eforce[i] = { 0, -particles::GRAVITY_STRENGTH, 0 };
+    if (flow_up) {
+      ps.eforce[i].y = particles::GRAVITY_STRENGTH * FOUNTAIN_STRENGTH;
+    }
   }
 
   // 6. Integrate.
@@ -119,9 +127,9 @@ bool update(libcommon::SDLCtx *ctx) {
     acceleration.z = ps.pforce[i].z + ps.vforce[i].z + ps.eforce[i].z;
 
     // v = a * dt;
-    ps.vel[i].x = acceleration.x * (1.0f / 60); // FIXME: actually use delta time.
-    ps.vel[i].y = acceleration.y * (1.0f / 60);
-    ps.vel[i].z = acceleration.z * (1.0f / 60);
+    ps.vel[i].x += acceleration.x * (1.0f / 60); // FIXME: actually use delta time.
+    ps.vel[i].y += acceleration.y * (1.0f / 60);
+    ps.vel[i].z += acceleration.z * (1.0f / 60);
 
     // d = v * dt;
     ps.pos[i].x += ps.vel[i].x * (1.0f / 60);
@@ -141,10 +149,6 @@ bool update(libcommon::SDLCtx *ctx) {
       ps.pos[i].z = std::clamp<float>(ps.pos[i].z, BACKWARD_BOUND, FORWARD_BOUND);
       ps.vel[i].z *= -0.5;
     }
-  }
-
-  if (frame_counter % 300 == 0) {
-    gravity_dir = -gravity_dir;
   }
 
   if (!bench_mode) {

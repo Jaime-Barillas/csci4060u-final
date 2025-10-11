@@ -12,7 +12,7 @@ namespace particles {
   constexpr float GAS_CONSTANT = 0.3f;
   constexpr float REST_DENSITY = 300.0f;
   constexpr float VISCOSITY_CONSTANT = 0.1f;
-  constexpr float GRAVITY_STRENGTH = 30.0f;
+  constexpr float GRAVITY_STRENGTH = 10.0f;
 
   struct Vec3 {
     float x;
