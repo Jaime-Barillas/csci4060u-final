@@ -1,5 +1,9 @@
 # CSCI4060U Final
 
+https://github.com/user-attachments/assets/9f8dd7d4-c168-47c0-b197-aa90cecd26c3
+
+---
+
 1. Initialize particles
 2. Sort into bins.
    + Bin size based on interaction radius.
