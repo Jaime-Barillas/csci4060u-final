@@ -111,4 +111,66 @@ namespace particles {
     q = (q < 0) ? 0 : q;
     return q * COEFFICIENT;
   }
+
+  uint32_t _bin(Vec3 pos, uint32_t grid_width) {
+    // Offset position by (1, 1, 1) since loc
+    uint32_t x_index = (pos.x + 1.0f) / grid_width;
+    uint32_t y_index = (pos.y + 1.0f) / grid_width;
+    uint32_t z_index = (pos.z + 1.0f) / grid_width;
+
+    return x_index + (grid_width * y_index) + (grid_width * grid_width * z_index);
+  }
+
+  void _ensure_same_size(Particles &scratch, const Particles &ps) {
+    scratch.pos.resize(ps.pos.size());
+    scratch.vel.resize(ps.vel.size());
+    scratch.pforce.resize(ps.pforce.size());
+    scratch.vforce.resize(ps.vforce.size());
+    scratch.eforce.resize(ps.eforce.size());
+    scratch.density.resize(ps.density.size());
+    scratch.pressure.resize(ps.pressure.size());
+  }
+
+  Particles scratch;
+  std::vector<uint32_t> count;
+  void count_sort(Particles &ps) {
+    uint32_t grid_width = std::ceilf(2.0f / SUPPORT);
+    uint32_t bin_count = grid_width * grid_width * grid_width;
+    size_t particle_count = ps.pos.size();
+
+    _ensure_same_size(scratch, ps);
+    count.resize(bin_count + 1);
+    for (auto &c : count) { c = 0; }
+
+    for (size_t i = 0; i < particle_count; i++) {
+      uint32_t j = _bin(ps.pos[i], grid_width);
+      count[j] += 1;
+    }
+
+    for (size_t j = 1; j < (bin_count + 1); j++) {
+      count[j] = count[j - 1] + count[j];
+    }
+
+    for (int32_t i = (particle_count - 1); i > 0; i--) {
+      uint32_t j = _bin(ps.pos[i], grid_width);
+      count[j] -= 1;
+      scratch.pos[count[j]] = ps.pos[i];
+      scratch.vel[count[j]] = ps.vel[i];
+      scratch.pforce[count[j]] = ps.pforce[i];
+      scratch.vforce[count[j]] = ps.vforce[i];
+      scratch.eforce[count[j]] = ps.eforce[i];
+      scratch.density[count[j]] = ps.density[i];
+      scratch.pressure[count[j]] = ps.pressure[i];
+    }
+
+    for (size_t i = 0; i < particle_count; i++) {
+      ps.pos[i] = scratch.pos[i];
+      ps.vel[i] = scratch.vel[i];
+      ps.pforce[i] = scratch.pforce[i];
+      ps.vforce[i] = scratch.vforce[i];
+      ps.eforce[i] = scratch.eforce[i];
+      ps.density[i] = scratch.density[i];
+      ps.pressure[i] = scratch.pressure[i];
+    }
+  }
 }

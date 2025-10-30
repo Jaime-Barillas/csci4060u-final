@@ -44,6 +44,10 @@ namespace particles {
     float right_bound
   );
 
+  // Neighbour Functions.
+  void count_sort(Particles &ps);
+
+  // Kernel Functions.
   struct PolyKernel      { using return_type = float; };
   struct SpikyGradKernel { using return_type = Vec3; };
   struct ViscLaplKernel  { using return_type = float; };
