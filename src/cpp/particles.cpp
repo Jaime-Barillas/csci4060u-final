@@ -1,5 +1,6 @@
 #include "particles.h"
 #include "util.h"
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <numbers>
@@ -171,6 +172,116 @@ namespace particles {
       ps.eforce[i] = scratch.eforce[i];
       ps.density[i] = scratch.density[i];
       ps.pressure[i] = scratch.pressure[i];
+    }
+  }
+
+  void calculate_density_pressure(Particles &ps) {
+    size_t particle_count = ps.pos.size();
+
+    for (size_t i = 0; i < particle_count; i++) {
+      ps.density[i] = 0.0;
+      ps.pressure[i] = 0.0;
+      for (size_t j = 0; j < particle_count; j++) {
+        ps.density[i] += kernel<PolyKernel>(ps.pos[i], ps.pos[j]);
+      }
+      ps.pressure[i] = GAS_CONSTANT * (ps.density[i] - REST_DENSITY);
+    }
+  }
+
+  void calculate_pressure_forces(Particles &ps) {
+    // FIXME: Something is wrong with the calculation.
+    //        Particles tend to get 'sucked' into each other.
+    size_t particle_count = ps.pos.size();
+
+    Vec3 pressure_kernel_temp;
+    for (size_t i = 0; i < particle_count; i++) {
+      Vec3 pressure_temp = { 0, 0, 0 };
+
+      for (size_t j = 0; j < particle_count; j++) {
+        pressure_kernel_temp = kernel<SpikyGradKernel>(ps.pos[i], ps.pos[j]);
+        float pressure_factor = (ps.pressure[i] + ps.pressure[j]) / (2 * ps.density[j]);
+        pressure_temp.x += pressure_kernel_temp.x * pressure_factor;
+        pressure_temp.y += pressure_kernel_temp.y * pressure_factor;
+        pressure_temp.z += pressure_kernel_temp.z * pressure_factor;
+      }
+
+      ps.pforce[i] = pressure_temp;
+    }
+  }
+
+  void calculate_viscosity_forces(Particles &ps) {
+    size_t particle_count = ps.pos.size();
+    
+    float viscosity_kernel_temp;
+    for (size_t i = 0; i < particle_count; i++) {
+      particles::Vec3 viscosity_temp = { 0, 0, 0 };
+
+      for (size_t j = 0; j < particle_count; j++) {
+        viscosity_kernel_temp = kernel<ViscLaplKernel>(ps.pos[i], ps.pos[j]);
+        float viscosity_factor_x = (ps.vel[j].x - ps.vel[i].x) / ps.density[j];
+        float viscosity_factor_y = (ps.vel[j].y - ps.vel[i].y) / ps.density[j];
+        float viscosity_factor_z = (ps.vel[j].z - ps.vel[i].z) / ps.density[j];
+        viscosity_temp.x += VISCOSITY_CONSTANT * viscosity_kernel_temp * viscosity_factor_x;
+        viscosity_temp.y += VISCOSITY_CONSTANT * viscosity_kernel_temp * viscosity_factor_y;
+        viscosity_temp.z += VISCOSITY_CONSTANT * viscosity_kernel_temp * viscosity_factor_z;
+      }
+
+      ps.vforce[i] = viscosity_temp;
+    }
+  }
+
+  void calculate_external_forces(Particles &ps) {
+    size_t particle_count = ps.pos.size();
+
+    for (size_t i = 0; i < particle_count; i++) {
+      /*
+      ps.eforce[i] = ps.pos[i].normalized();
+      ps.eforce[i].negate();
+      ps.eforce[i] *= particles::GRAVITY_STRENGTH;
+      */
+      bool flow_up = ps.pos[i].y < 0
+                   && std::abs(ps.pos[i].x) < FOUNTAIN_WIDTH
+                   && std::abs(ps.pos[i].z) < FOUNTAIN_WIDTH;
+      ps.eforce[i] = { 0, -GRAVITY_STRENGTH, 0 };
+      if (flow_up) {
+        ps.eforce[i].y = GRAVITY_STRENGTH * FOUNTAIN_STRENGTH;
+      }
+    }
+  }
+
+  void integrate(Particles &ps) {
+    size_t particle_count = ps.pos.size();
+
+    particles::Vec3 acceleration;
+    for (size_t i = 0; i < particle_count; i++) {
+      // F = ma <=> a = F/m, m = 1.0 => a = F
+      acceleration.x = ps.pforce[i].x + ps.vforce[i].x + ps.eforce[i].x;
+      acceleration.y = ps.pforce[i].y + ps.vforce[i].y + ps.eforce[i].y;
+      acceleration.z = ps.pforce[i].z + ps.vforce[i].z + ps.eforce[i].z;
+
+      // v = a * dt;
+      ps.vel[i].x += acceleration.x * (1.0f / 60); // FIXME: actually use delta time.
+      ps.vel[i].y += acceleration.y * (1.0f / 60);
+      ps.vel[i].z += acceleration.z * (1.0f / 60);
+
+      // d = v * dt;
+      ps.pos[i].x += ps.vel[i].x * (1.0f / 60);
+      ps.pos[i].y += ps.vel[i].y * (1.0f / 60);
+      ps.pos[i].z += ps.vel[i].z * (1.0f / 60);
+
+      // Boundary conditions.
+      if (ps.pos[i].x < LEFT_BOUND || ps.pos[i].x > RIGHT_BOUND) {
+        ps.pos[i].x = std::clamp<float>(ps.pos[i].x, LEFT_BOUND, RIGHT_BOUND);
+        ps.vel[i].x *= -0.5;
+      }
+      if (ps.pos[i].y < LOWER_BOUND || ps.pos[i].y > UPPER_BOUND) {
+        ps.pos[i].y = std::clamp<float>(ps.pos[i].y, LOWER_BOUND, UPPER_BOUND);
+        ps.vel[i].y *= -0.5;
+      }
+      if (ps.pos[i].z < BACKWARD_BOUND || ps.pos[i].z > FORWARD_BOUND) {
+        ps.pos[i].z = std::clamp<float>(ps.pos[i].z, BACKWARD_BOUND, FORWARD_BOUND);
+        ps.vel[i].z *= -0.5;
+      }
     }
   }
 }

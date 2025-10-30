@@ -13,6 +13,16 @@ namespace particles {
   constexpr float REST_DENSITY = 300.0f;
   constexpr float VISCOSITY_CONSTANT = 0.1f;
   constexpr float GRAVITY_STRENGTH = 10.0f;
+  constexpr float FOUNTAIN_WIDTH = 0.25;
+  constexpr float FOUNTAIN_STRENGTH = 1.5;
+
+  // Simulation area bounds.
+  constexpr float LEFT_BOUND = -1.0;
+  constexpr float RIGHT_BOUND = 1.0;
+  constexpr float LOWER_BOUND = -1.0;
+  constexpr float UPPER_BOUND = 1.0;
+  constexpr float BACKWARD_BOUND = -1.0;
+  constexpr float FORWARD_BOUND = 1.0;
 
   struct Vec3 {
     float x;
@@ -60,4 +70,11 @@ namespace particles {
   template<typename T>
   requires Kernel<T>
   typename T::return_type kernel(Vec3 &pos, Vec3 &particle);
+
+  // Force Computation Functions.
+  void calculate_density_pressure(Particles &ps);
+  void calculate_pressure_forces(Particles &ps);
+  void calculate_viscosity_forces(Particles &ps);
+  void calculate_external_forces(Particles &ps);
+  void integrate(Particles &ps);
 }
