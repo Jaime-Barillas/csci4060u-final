@@ -4,3 +4,6 @@
 [submodule "subprojects/sdl3_ttf"]
 	path = subprojects/sdl3_ttf
 	url = https://github.com/libsdl-org/SDL_ttf.git
+[submodule "subprojects/catch2"]
+	path = subprojects/catch2
+	url = https://github.com/catchorg/Catch2.git
