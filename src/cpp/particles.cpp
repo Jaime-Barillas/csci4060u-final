@@ -113,11 +113,28 @@ namespace particles {
     return q * COEFFICIENT;
   }
 
-  uint32_t _bin(Vec3 pos, uint32_t grid_width) {
-    // Offset position by (1, 1, 1) since loc
-    uint32_t x_index = (pos.x + 1.0f) / grid_width;
-    uint32_t y_index = (pos.y + 1.0f) / grid_width;
-    uint32_t z_index = (pos.z + 1.0f) / grid_width;
+  void _cell_indexes(Vec3 pos, uint32_t grid_width, uint32_t &x, uint32_t &y, uint32_t &z) {
+    // NOTE: Cube shaped simulation area centered on origin.
+    //       Need to offset `pos` since calculations rely on positive numbers.
+    const float SIM_AREA_WIDTH = particles::RIGHT_BOUND - particles::LEFT_BOUND;
+    const float SIM_AREA_HALF_WIDTH = particles::RIGHT_BOUND;
+
+    x = static_cast<uint32_t>((pos.x + SIM_AREA_HALF_WIDTH) / SIM_AREA_WIDTH * grid_width);
+    y = static_cast<uint32_t>((pos.y + SIM_AREA_HALF_WIDTH) / SIM_AREA_WIDTH * grid_width);
+    z = static_cast<uint32_t>((pos.z + SIM_AREA_HALF_WIDTH) / SIM_AREA_WIDTH * grid_width);
+
+    // Handle boundary when x, y, or z are at their top bounds (e.x. 1.0 for
+    // sim bounds -1.0 to 1.0). When this happens, the above calculation will
+    // result in index values of `grid_width`, but the valid range is
+    // 0 to (grid_width - 1).
+    x -= (x == grid_width);
+    y -= (y == grid_width);
+    z -= (z == grid_width);
+  }
+
+  uint32_t cell_index(Vec3 pos, uint32_t grid_width) {
+    uint32_t x_index, y_index, z_index;
+    _cell_indexes(pos, grid_width, x_index, y_index, z_index);
 
     return x_index + (grid_width * y_index) + (grid_width * grid_width * z_index);
   }
@@ -134,26 +151,37 @@ namespace particles {
 
   Particles scratch;
   std::vector<uint32_t> count;
+  std::vector<uint32_t> bin_start;
   void count_sort(Particles &ps) {
-    uint32_t grid_width = std::ceilf(2.0f / SUPPORT);
+    uint32_t grid_width = std::floorf(2.0f / SUPPORT);
     uint32_t bin_count = grid_width * grid_width * grid_width;
     size_t particle_count = ps.pos.size();
 
     _ensure_same_size(scratch, ps);
     count.resize(bin_count + 1);
+    bin_start.resize(bin_count + 1);
     for (auto &c : count) { c = 0; }
 
+      std::fflush(NULL);
     for (size_t i = 0; i < particle_count; i++) {
-      uint32_t j = _bin(ps.pos[i], grid_width);
+      uint32_t j = cell_index(ps.pos[i], grid_width);
       count[j] += 1;
     }
 
+      std::fflush(NULL);
     for (size_t j = 1; j < (bin_count + 1); j++) {
       count[j] = count[j - 1] + count[j];
     }
 
+      std::fflush(NULL);
+    // Record start of bins
+    bin_start[0] = 0;
+    for (size_t j = 1; j < (bin_count + 1); j++) {
+      bin_start[j] = count[j - 1];
+    }
+
     for (int32_t i = (particle_count - 1); i > 0; i--) {
-      uint32_t j = _bin(ps.pos[i], grid_width);
+      uint32_t j = cell_index(ps.pos[i], grid_width);
       count[j] -= 1;
       scratch.pos[count[j]] = ps.pos[i];
       scratch.vel[count[j]] = ps.vel[i];
@@ -175,22 +203,84 @@ namespace particles {
     }
   }
 
+  void _fetch_neighbours(const Particles &ps, size_t p_idx, uint32_t grid_width, Particles &neighbours) {
+    uint32_t x_index, y_index, z_index;
+    _cell_indexes(ps.pos[p_idx], grid_width, x_index, y_index, z_index);
+
+    neighbours.pos.clear();
+    neighbours.vel.clear();
+    neighbours.density.clear();
+    neighbours.pressure.clear();
+
+    for (int32_t i = x_index - 1; i < x_index + 1; i++) {
+      if (i < 0 || i >= grid_width) continue;
+
+      for (int32_t j = y_index - 1; j < y_index + 1; j++) {
+        if (j < 0 || i >= grid_width) continue;
+
+        for (int32_t k = z_index - 1; k < z_index + 1; k++) {
+          if (k < 0 || i >= grid_width) continue;
+
+          uint32_t bin = i + (j * grid_width) + (k * grid_width * grid_width);
+          uint32_t start_idx = bin_start[bin];
+          uint32_t end_idx = bin_start[bin + 1];
+          for (uint32_t p = start_idx; p < end_idx; p++) {
+            neighbours.pos.push_back(ps.pos[p]);
+            neighbours.vel.push_back(ps.vel[p]);
+            neighbours.density.push_back(ps.density[p]);
+            neighbours.pressure.push_back(ps.pressure[p]);
+          }
+        }
+      }
+    }
+  }
+
   void calculate_density_pressure(Particles &ps) {
+    // static Particles neighbours;
+    // static uint32_t grid_width = std::ceilf(2.0f / SUPPORT);
     size_t particle_count = ps.pos.size();
 
     for (size_t i = 0; i < particle_count; i++) {
+      // _fetch_neighbours(ps, i, grid_width, neighbours);
+      // // if (neighbours.pos.size() == 0) continue;
+
       ps.density[i] = 0.0;
       ps.pressure[i] = 0.0;
+
+    // uint32_t x_index = static_cast<uint32_t>(std::floor((ps.pos[i].x + 1.0f) / 2.0f * 0.99 * grid_width));
+    // uint32_t y_index = static_cast<uint32_t>(std::floor((ps.pos[i].y + 1.0f) / 2.0f * 0.99 * grid_width));
+    // uint32_t z_index = static_cast<uint32_t>(std::floor((ps.pos[i].z + 1.0f) / 2.0f * 0.99 * grid_width));
+    // uint32_t bin_idx = x_index + (y_index * grid_width) + (z_index * grid_width * grid_width);
+    // std::printf("%4lu (%+.2f, %+.2f, %+.2f): (%u, %u, %u) %3u - Neighbour count: %3lu, bin start: %4u, bin end: %4u\n",
+    //             i,
+    //             ps.pos[i].x,
+    //             ps.pos[i].y,
+    //             ps.pos[i].z,
+    //             x_index,
+    //             y_index,
+    //             z_index,
+    //             bin_idx,
+    //             neighbours.pos.size(),
+    //             bin_start[bin_idx],
+    //             bin_start[bin_idx + 1]
+    //           );
+    // // if (neighbours.pos.size() == 0) {
+    // //   std::printf("Got 0 at: %lu\n", i);
+    // // }
+
       for (size_t j = 0; j < particle_count; j++) {
         ps.density[i] += kernel<PolyKernel>(ps.pos[i], ps.pos[j]);
       }
       ps.pressure[i] = GAS_CONSTANT * (ps.density[i] - REST_DENSITY);
     }
+    // std::fflush(NULL);
+    // std::exit(0);
   }
 
   void calculate_pressure_forces(Particles &ps) {
     // FIXME: Something is wrong with the calculation.
     //        Particles tend to get 'sucked' into each other.
+    //        Try smaller timesteps ?
     size_t particle_count = ps.pos.size();
 
     Vec3 pressure_kernel_temp;

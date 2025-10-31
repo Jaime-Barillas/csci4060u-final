@@ -1,18 +1,29 @@
 set(
-  CPP_SRCS
-  "${CMAKE_CURRENT_SOURCE_DIR}/main.cpp"
+  CPP_LIB_SRCS
   "${CMAKE_CURRENT_SOURCE_DIR}/particles.cpp"
 )
 
 # Sequential C program
+add_library(sph-cpp-lib STATIC ${CPP_LIB_SRCS})
+target_include_directories(
+  sph-cpp-lib
+  INTERFACE
+    "${CMAKE_CURRENT_SOURCE_DIR}"
+)
+target_link_libraries(
+  sph-cpp-lib
+  PUBLIC
+    common
+)
+
 add_executable(
   sph-cpp
-  ${CPP_SRCS}
+  "${CMAKE_CURRENT_SOURCE_DIR}/main.cpp"
 )
 target_link_libraries(
   sph-cpp
   PUBLIC
-    common
+    sph-cpp-lib
 )
 set_target_properties(
   sph-cpp
@@ -27,12 +38,14 @@ set_target_properties(
 find_package(Threads REQUIRED)
 add_executable(
   sph-cpp-par
-  ${CPP_SRCS}
+  "${CMAKE_CURRENT_SOURCE_DIR}/main.cpp"
+  ${CPP_LIB_SRCS}
 )
 target_link_libraries(
   sph-cpp-par
   PUBLIC
     Threads::Threads
+    sph-cpp-lib
     common
 )
 set_target_properties(

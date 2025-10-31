@@ -55,6 +55,7 @@ namespace particles {
   );
 
   // Neighbour Functions.
+  uint32_t cell_index(Vec3 pos, uint32_t grid_width);
   void count_sort(Particles &ps);
 
   // Kernel Functions.
