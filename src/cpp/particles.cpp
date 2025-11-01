@@ -162,25 +162,22 @@ namespace particles {
     bin_start.resize(bin_count + 1);
     for (auto &c : count) { c = 0; }
 
-      std::fflush(NULL);
     for (size_t i = 0; i < particle_count; i++) {
       uint32_t j = cell_index(ps.pos[i], grid_width);
       count[j] += 1;
     }
 
-      std::fflush(NULL);
     for (size_t j = 1; j < (bin_count + 1); j++) {
       count[j] = count[j - 1] + count[j];
     }
 
-      std::fflush(NULL);
     // Record start of bins
     bin_start[0] = 0;
     for (size_t j = 1; j < (bin_count + 1); j++) {
       bin_start[j] = count[j - 1];
     }
 
-    for (int32_t i = (particle_count - 1); i > 0; i--) {
+    for (int32_t i = (particle_count - 1); i >= 0; i--) {
       uint32_t j = cell_index(ps.pos[i], grid_width);
       count[j] -= 1;
       scratch.pos[count[j]] = ps.pos[i];
