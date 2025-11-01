@@ -25,6 +25,18 @@ namespace particles {
     z *= scalar;
   }
 
+  void Particles::resize(size_t new_size) {
+    pos.resize(new_size);
+    vel.resize(new_size);
+    pforce.resize(new_size);
+    vforce.resize(new_size);
+    eforce.resize(new_size);
+    density.resize(new_size);
+    pressure.resize(new_size);
+  }
+
+  size_t Particles::size() const { return pos.size(); }
+
   void reset(
     Particles &particles,
     uint32_t count,
@@ -35,13 +47,7 @@ namespace particles {
     float step = (right_bound - left_bound) * USABLE_SPACE_MODIFIER / length;
     float start = (-step * length) / 2.0f;
 
-    particles.pos.resize(count);
-    particles.vel.resize(count);
-    particles.pforce.resize(count);
-    particles.vforce.resize(count);
-    particles.eforce.resize(count);
-    particles.density.resize(count);
-    particles.pressure.resize(count);
+    particles.resize(count);
 
     for (uint32_t i : std::views::iota(0u, count)) {
       uint32_t x = i % length;
@@ -140,13 +146,7 @@ namespace particles {
   }
 
   void _ensure_same_size(Particles &scratch, const Particles &ps) {
-    scratch.pos.resize(ps.pos.size());
-    scratch.vel.resize(ps.vel.size());
-    scratch.pforce.resize(ps.pforce.size());
-    scratch.vforce.resize(ps.vforce.size());
-    scratch.eforce.resize(ps.eforce.size());
-    scratch.density.resize(ps.density.size());
-    scratch.pressure.resize(ps.pressure.size());
+    scratch.resize(ps.size());
   }
 
   Particles scratch;
@@ -155,7 +155,7 @@ namespace particles {
   void count_sort(Particles &ps) {
     uint32_t grid_width = std::floorf(2.0f / SUPPORT);
     uint32_t bin_count = grid_width * grid_width * grid_width;
-    size_t particle_count = ps.pos.size();
+    size_t particle_count = ps.size();
 
     _ensure_same_size(scratch, ps);
     count.resize(bin_count + 1);
@@ -238,11 +238,11 @@ namespace particles {
   void calculate_density_pressure(Particles &ps) {
     // static Particles neighbours;
     // static uint32_t grid_width = std::ceilf(2.0f / SUPPORT);
-    size_t particle_count = ps.pos.size();
+    size_t particle_count = ps.size();
 
     for (size_t i = 0; i < particle_count; i++) {
       // _fetch_neighbours(ps, i, grid_width, neighbours);
-      // // if (neighbours.pos.size() == 0) continue;
+      // // if (neighbours.size() == 0) continue;
 
       ps.density[i] = 0.0;
       ps.pressure[i] = 0.0;
@@ -260,11 +260,11 @@ namespace particles {
     //             y_index,
     //             z_index,
     //             bin_idx,
-    //             neighbours.pos.size(),
+    //             neighbours.size(),
     //             bin_start[bin_idx],
     //             bin_start[bin_idx + 1]
     //           );
-    // // if (neighbours.pos.size() == 0) {
+    // // if (neighbours.size() == 0) {
     // //   std::printf("Got 0 at: %lu\n", i);
     // // }
 
@@ -281,7 +281,7 @@ namespace particles {
     // FIXME: Something is wrong with the calculation.
     //        Particles tend to get 'sucked' into each other.
     //        Try smaller timesteps ?
-    size_t particle_count = ps.pos.size();
+    size_t particle_count = ps.size();
 
     Vec3 pressure_kernel_temp;
     for (size_t i = 0; i < particle_count; i++) {
@@ -300,7 +300,7 @@ namespace particles {
   }
 
   void calculate_viscosity_forces(Particles &ps) {
-    size_t particle_count = ps.pos.size();
+    size_t particle_count = ps.size();
     
     float viscosity_kernel_temp;
     for (size_t i = 0; i < particle_count; i++) {
@@ -321,7 +321,7 @@ namespace particles {
   }
 
   void calculate_external_forces(Particles &ps) {
-    size_t particle_count = ps.pos.size();
+    size_t particle_count = ps.size();
 
     for (size_t i = 0; i < particle_count; i++) {
       /*
@@ -340,7 +340,7 @@ namespace particles {
   }
 
   void integrate(Particles &ps) {
-    size_t particle_count = ps.pos.size();
+    size_t particle_count = ps.size();
 
     particles::Vec3 acceleration;
     for (size_t i = 0; i < particle_count; i++) {

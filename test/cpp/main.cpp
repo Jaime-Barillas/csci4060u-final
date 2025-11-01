@@ -1,8 +1,13 @@
 #include "generators.h"
+#include "misc_declarations.h" // Includes functions required by Catch2 to work on custom types.
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators_adapters.hpp>
+#include <catch2/matchers/catch_matchers.hpp>
+#include <catch2/matchers/catch_matchers_vector.hpp>
 #include <cmath>
+#include <format>
 #include <particles.h>
+#include <string>
 
 TEST_CASE("Cell Index", "[sort]") {
   uint32_t grid_width = std::floorf((particles::RIGHT_BOUND - particles::LEFT_BOUND) / particles::SUPPORT);
@@ -57,5 +62,35 @@ TEST_CASE("Cell Index", "[sort]") {
     REQUIRE(((x_start <= pos.x) && (pos.x < x_end) &&
              (y_start <= pos.y) && (pos.y < y_end) &&
              (z_start <= pos.z) && (pos.z < z_end)));
+  }
+}
+
+TEST_CASE("Count Sort", "[sort]") {
+  uint32_t grid_width = std::floorf((particles::RIGHT_BOUND - particles::LEFT_BOUND) / particles::SUPPORT);
+  auto vec_gen = random_Vec3(-1.0f, 1.0f);
+  particles::Particles ps;
+  ps.resize(5);
+
+  for (auto &pos : ps.pos) {
+    pos = vec_gen.get();
+    vec_gen.next();
+  }
+
+  std::vector<particles::Vec3> orig_pos = ps.pos;
+  particles::count_sort(ps);
+
+  REQUIRE_THAT(orig_pos, Catch::Matchers::UnorderedEquals(ps.pos));
+
+  std::string info;
+  for (const auto &pos : ps.pos) {
+    info += std::format("{}: ({}, {}, {})  ", particles::cell_index(pos, grid_width), pos.x, pos.y, pos.z);
+  }
+  INFO(info);
+
+  for (int i = 1; i < ps.size(); i++) {
+    uint32_t prev_cell_index = particles::cell_index(ps.pos[i - 1], grid_width);
+    uint32_t curr_cell_index = particles::cell_index(ps.pos[i], grid_width);
+
+    REQUIRE(prev_cell_index <= curr_cell_index);
   }
 }

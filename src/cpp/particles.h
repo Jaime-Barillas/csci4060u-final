@@ -45,6 +45,9 @@ namespace particles {
     std::vector<Vec3> eforce; // External forces
     std::vector<float> density;
     std::vector<float> pressure;
+
+    void resize(size_t new_size);
+    size_t size() const;
   };
 
   void reset(
