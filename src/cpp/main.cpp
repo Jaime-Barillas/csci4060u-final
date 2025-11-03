@@ -52,7 +52,7 @@ bool update(libcommon::SDLCtx *ctx) {
                                              * libcommon::matrix::rotation_y(degrees);
 
   // Simulation.
-  // particles::count_sort(ps);
+  particles::count_sort(ps);
   particles::calculate_density_pressure(ps);
   particles::calculate_pressure_forces(ps);
   particles::calculate_viscosity_forces(ps);

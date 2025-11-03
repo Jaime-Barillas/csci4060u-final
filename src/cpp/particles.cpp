@@ -209,14 +209,14 @@ namespace particles {
     neighbours.density.clear();
     neighbours.pressure.clear();
 
-    for (int32_t i = ((int32_t)x_index) - 1; i < ((int32_t)x_index) + 1; i++) {
+    for (int32_t i = ((int32_t)x_index) - 1; i <= ((int32_t)x_index) + 1; i++) {
       if (i < 0 || i >= grid_width) continue;
 
-      for (int32_t j = ((int32_t)y_index) - 1; j < ((int32_t)y_index) + 1; j++) {
-        if (j < 0 || i >= grid_width) continue;
+      for (int32_t j = ((int32_t)y_index) - 1; j <= ((int32_t)y_index) + 1; j++) {
+        if (j < 0 || j >= grid_width) continue;
 
-        for (int32_t k = ((int32_t)z_index) - 1; k < ((int32_t)z_index) + 1; k++) {
-          if (k < 0 || i >= grid_width) continue;
+        for (int32_t k = ((int32_t)z_index) - 1; k <= ((int32_t)z_index) + 1; k++) {
+          if (k < 0 || k >= grid_width) continue;
 
           uint32_t bin = i + (j * grid_width) + (k * grid_width * grid_width);
           uint32_t start_idx = bin_start[bin];
@@ -233,12 +233,12 @@ namespace particles {
   }
 
   void calculate_density_pressure(Particles &ps) {
-    // static Particles neighbours;
-    // static uint32_t grid_width = std::ceilf(2.0f / SUPPORT);
+    static Particles neighbours;
+    static uint32_t grid_width = std::floorf(2.0f / SUPPORT);
     size_t particle_count = ps.size();
 
     for (size_t i = 0; i < particle_count; i++) {
-      // fetch_neighbours(ps, i, grid_width, neighbours);
+      fetch_neighbours(ps, i, grid_width, neighbours);
       // // if (neighbours.size() == 0) continue;
 
       ps.density[i] = 0.0;
@@ -265,13 +265,11 @@ namespace particles {
     // //   std::printf("Got 0 at: %lu\n", i);
     // // }
 
-      for (size_t j = 0; j < particle_count; j++) {
-        ps.density[i] += kernel<PolyKernel>(ps.pos[i], ps.pos[j]);
+      for (size_t j = 0; j < neighbours.size(); j++) {
+        ps.density[i] += kernel<PolyKernel>(ps.pos[i], neighbours.pos[j]);
       }
       ps.pressure[i] = GAS_CONSTANT * (ps.density[i] - REST_DENSITY);
     }
-    // std::fflush(NULL);
-    // std::exit(0);
   }
 
   void calculate_pressure_forces(Particles &ps) {
