@@ -200,7 +200,7 @@ namespace particles {
     }
   }
 
-  void _fetch_neighbours(const Particles &ps, size_t p_idx, uint32_t grid_width, Particles &neighbours) {
+  void fetch_neighbours(const Particles &ps, size_t p_idx, uint32_t grid_width, Particles &neighbours) {
     uint32_t x_index, y_index, z_index;
     _cell_indexes(ps.pos[p_idx], grid_width, x_index, y_index, z_index);
 
@@ -209,13 +209,13 @@ namespace particles {
     neighbours.density.clear();
     neighbours.pressure.clear();
 
-    for (int32_t i = x_index - 1; i < x_index + 1; i++) {
+    for (int32_t i = ((int32_t)x_index) - 1; i < ((int32_t)x_index) + 1; i++) {
       if (i < 0 || i >= grid_width) continue;
 
-      for (int32_t j = y_index - 1; j < y_index + 1; j++) {
+      for (int32_t j = ((int32_t)y_index) - 1; j < ((int32_t)y_index) + 1; j++) {
         if (j < 0 || i >= grid_width) continue;
 
-        for (int32_t k = z_index - 1; k < z_index + 1; k++) {
+        for (int32_t k = ((int32_t)z_index) - 1; k < ((int32_t)z_index) + 1; k++) {
           if (k < 0 || i >= grid_width) continue;
 
           uint32_t bin = i + (j * grid_width) + (k * grid_width * grid_width);
@@ -238,7 +238,7 @@ namespace particles {
     size_t particle_count = ps.size();
 
     for (size_t i = 0; i < particle_count; i++) {
-      // _fetch_neighbours(ps, i, grid_width, neighbours);
+      // fetch_neighbours(ps, i, grid_width, neighbours);
       // // if (neighbours.size() == 0) continue;
 
       ps.density[i] = 0.0;

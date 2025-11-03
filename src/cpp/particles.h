@@ -60,6 +60,7 @@ namespace particles {
   // Neighbour Functions.
   uint32_t cell_index(Vec3 pos, uint32_t grid_width);
   void count_sort(Particles &ps);
+  void fetch_neighbours(const Particles &ps, size_t p_idx, uint32_t grid_width, Particles &neighbours);
 
   // Kernel Functions.
   struct PolyKernel      { using return_type = float; };

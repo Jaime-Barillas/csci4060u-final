@@ -94,3 +94,37 @@ TEST_CASE("Count Sort", "[sort]") {
     REQUIRE(prev_cell_index <= curr_cell_index);
   }
 }
+
+TEST_CASE("Fetch Neighbours", "[sort]") {
+  uint32_t grid_width = std::floorf((particles::RIGHT_BOUND - particles::LEFT_BOUND) / particles::SUPPORT);
+  particles::Particles ps;
+  ps.resize(9);
+
+  SECTION("Same Bucket") {
+    for (int i = 0; i < ps.size(); i++) {
+      ps.pos[i] = particles::Vec3(0 + (0.01 * i), 0, 0);
+    }
+  }
+
+  SECTION("Low extreme") {
+    ps.pos[0] = particles::Vec3(-1, -1, -1);
+    ps.pos[1] = particles::Vec3(-0.7, -1, -1);
+    ps.pos[2] = particles::Vec3(-1, -0.7, -1);
+    ps.pos[3] = particles::Vec3(-0.7, -0.7, -1);
+
+    ps.pos[4] = particles::Vec3(-1, -1, -0.7);
+    ps.pos[5] = particles::Vec3(-0.7, -1, -0.7);
+    ps.pos[6] = particles::Vec3(-1, -0.7, -0.7);
+    ps.pos[7] = particles::Vec3(-0.7, -0.7, -0.7);
+
+    ps.pos[8] = particles::Vec3(-1, -1, 1); // Not a neighbour to index 0
+
+    particles::count_sort(ps);
+    particles::Particles neighbours;
+    particles::fetch_neighbours(ps, 0, grid_width, neighbours);
+
+    // Make sure to include self in neighbours to match old logic.
+    ps.pos.erase(ps.pos.end());
+    REQUIRE_THAT(neighbours.pos, Catch::Matchers::UnorderedEquals(ps.pos));
+  }
+}
