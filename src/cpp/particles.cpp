@@ -239,31 +239,9 @@ namespace particles {
 
     for (size_t i = 0; i < particle_count; i++) {
       fetch_neighbours(ps, i, grid_width, neighbours);
-      // // if (neighbours.size() == 0) continue;
 
       ps.density[i] = 0.0;
       ps.pressure[i] = 0.0;
-
-    // uint32_t x_index = static_cast<uint32_t>(std::floor((ps.pos[i].x + 1.0f) / 2.0f * 0.99 * grid_width));
-    // uint32_t y_index = static_cast<uint32_t>(std::floor((ps.pos[i].y + 1.0f) / 2.0f * 0.99 * grid_width));
-    // uint32_t z_index = static_cast<uint32_t>(std::floor((ps.pos[i].z + 1.0f) / 2.0f * 0.99 * grid_width));
-    // uint32_t bin_idx = x_index + (y_index * grid_width) + (z_index * grid_width * grid_width);
-    // std::printf("%4lu (%+.2f, %+.2f, %+.2f): (%u, %u, %u) %3u - Neighbour count: %3lu, bin start: %4u, bin end: %4u\n",
-    //             i,
-    //             ps.pos[i].x,
-    //             ps.pos[i].y,
-    //             ps.pos[i].z,
-    //             x_index,
-    //             y_index,
-    //             z_index,
-    //             bin_idx,
-    //             neighbours.size(),
-    //             bin_start[bin_idx],
-    //             bin_start[bin_idx + 1]
-    //           );
-    // // if (neighbours.size() == 0) {
-    // //   std::printf("Got 0 at: %lu\n", i);
-    // // }
 
       for (size_t j = 0; j < neighbours.size(); j++) {
         ps.density[i] += kernel<PolyKernel>(ps.pos[i], neighbours.pos[j]);
@@ -276,15 +254,18 @@ namespace particles {
     // FIXME: Something is wrong with the calculation.
     //        Particles tend to get 'sucked' into each other.
     //        Try smaller timesteps ?
+    static Particles neighbours;
+    static uint32_t grid_width = std::floorf(2.0f / SUPPORT);
     size_t particle_count = ps.size();
 
     Vec3 pressure_kernel_temp;
     for (size_t i = 0; i < particle_count; i++) {
       Vec3 pressure_temp = { 0, 0, 0 };
+      fetch_neighbours(ps, i, grid_width, neighbours);
 
-      for (size_t j = 0; j < particle_count; j++) {
-        pressure_kernel_temp = kernel<SpikyGradKernel>(ps.pos[i], ps.pos[j]);
-        float pressure_factor = (ps.pressure[i] + ps.pressure[j]) / (2 * ps.density[j]);
+      for (size_t j = 0; j < neighbours.size(); j++) {
+        pressure_kernel_temp = kernel<SpikyGradKernel>(ps.pos[i], neighbours.pos[j]);
+        float pressure_factor = (ps.pressure[i] + neighbours.pressure[j]) / (2 * neighbours.density[j]);
         pressure_temp.x += pressure_kernel_temp.x * pressure_factor;
         pressure_temp.y += pressure_kernel_temp.y * pressure_factor;
         pressure_temp.z += pressure_kernel_temp.z * pressure_factor;
@@ -295,17 +276,20 @@ namespace particles {
   }
 
   void calculate_viscosity_forces(Particles &ps) {
+    static Particles neighbours;
+    static uint32_t grid_width = std::floorf(2.0f / SUPPORT);
     size_t particle_count = ps.size();
     
     float viscosity_kernel_temp;
     for (size_t i = 0; i < particle_count; i++) {
       particles::Vec3 viscosity_temp = { 0, 0, 0 };
+      fetch_neighbours(ps, i, grid_width, neighbours);
 
-      for (size_t j = 0; j < particle_count; j++) {
-        viscosity_kernel_temp = kernel<ViscLaplKernel>(ps.pos[i], ps.pos[j]);
-        float viscosity_factor_x = (ps.vel[j].x - ps.vel[i].x) / ps.density[j];
-        float viscosity_factor_y = (ps.vel[j].y - ps.vel[i].y) / ps.density[j];
-        float viscosity_factor_z = (ps.vel[j].z - ps.vel[i].z) / ps.density[j];
+      for (size_t j = 0; j < neighbours.size(); j++) {
+        viscosity_kernel_temp = kernel<ViscLaplKernel>(ps.pos[i], neighbours.pos[j]);
+        float viscosity_factor_x = (neighbours.vel[j].x - ps.vel[i].x) / neighbours.density[j];
+        float viscosity_factor_y = (neighbours.vel[j].y - ps.vel[i].y) / neighbours.density[j];
+        float viscosity_factor_z = (neighbours.vel[j].z - ps.vel[i].z) / neighbours.density[j];
         viscosity_temp.x += VISCOSITY_CONSTANT * viscosity_kernel_temp * viscosity_factor_x;
         viscosity_temp.y += VISCOSITY_CONSTANT * viscosity_kernel_temp * viscosity_factor_y;
         viscosity_temp.z += VISCOSITY_CONSTANT * viscosity_kernel_temp * viscosity_factor_z;
