@@ -8,7 +8,7 @@ add_library(sph-cpp-lib STATIC ${CPP_LIB_SRCS})
 target_include_directories(
   sph-cpp-lib
   INTERFACE
-    "${CMAKE_CURRENT_SOURCE_DIR}"
+    "${CMAKE_CURRENT_SOURCE_DIR}/.."
 )
 target_link_libraries(
   sph-cpp-lib
