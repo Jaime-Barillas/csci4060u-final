@@ -5,35 +5,35 @@
 #include <catch2/matchers/catch_matchers.hpp>
 #include <catch2/matchers/catch_matchers_vector.hpp>
 #include <cmath>
-#include <format>
-#include <particles.h>
+#include <cpp/particles.h>
+#include <libcommon/vec.h>
 #include <string>
 
 TEST_CASE("Cell Index", "[sort]") {
   uint32_t grid_width = std::floorf((particles::RIGHT_BOUND - particles::LEFT_BOUND) / particles::SUPPORT);
 
   SECTION("(-1, -1, -1) maps to bin 0") {
-    particles::Vec3 pos{
-      .x = particles::LEFT_BOUND,
-      .y = particles::LOWER_BOUND,
-      .z = particles::BACKWARD_BOUND
+    Vec3 pos{
+      particles::LEFT_BOUND,
+      particles::LOWER_BOUND,
+      particles::BACKWARD_BOUND
     };
 
     uint32_t bin_index = particles::cell_index(pos, grid_width);
-    INFO("pos: (" << pos.x << ", " << pos.y << ", " << pos.z << ")");
+    INFO("pos: (" << pos.x() << ", " << pos.y() << ", " << pos.z() << ")");
     REQUIRE(bin_index == 0);
   }
 
   SECTION("(1, 1, 1) maps to bin max") {
     uint32_t bin_count = grid_width * grid_width * grid_width;
-    particles::Vec3 pos{
-      .x = particles::RIGHT_BOUND,
-      .y = particles::UPPER_BOUND,
-      .z = particles::FORWARD_BOUND
+    Vec3 pos{
+      particles::RIGHT_BOUND,
+      particles::UPPER_BOUND,
+      particles::FORWARD_BOUND
     };
 
     uint32_t bin_index = particles::cell_index(pos, grid_width);
-    INFO("pos: (" << pos.x << ", " << pos.y << ", " << pos.z << ")");
+    INFO("pos: (" << pos.x() << ", " << pos.y() << ", " << pos.z() << ")");
     REQUIRE(bin_index == (bin_count - 1));
   }
 
@@ -55,13 +55,13 @@ TEST_CASE("Cell Index", "[sort]") {
     float z_end = z_start + cell_width;
 
     INFO("Index: " << bin_index << " Grid Width: " << grid_width << " Cell Width: " << cell_width);
-    INFO("X: " << x_start << " <= " << pos.x << " < " << x_end);
-    INFO("Y: " << y_start << " <= " << pos.y << " < " << y_end);
-    INFO("Z: " << z_start << " <= " << pos.z << " < " << z_end);
+    INFO("X: " << x_start << " <= " << pos.x() << " < " << x_end);
+    INFO("Y: " << y_start << " <= " << pos.y() << " < " << y_end);
+    INFO("Z: " << z_start << " <= " << pos.z() << " < " << z_end);
 
-    REQUIRE(((x_start <= pos.x) && (pos.x < x_end) &&
-             (y_start <= pos.y) && (pos.y < y_end) &&
-             (z_start <= pos.z) && (pos.z < z_end)));
+    REQUIRE(((x_start <= pos.x()) && (pos.x() < x_end) &&
+             (y_start <= pos.y()) && (pos.y() < y_end) &&
+             (z_start <= pos.z()) && (pos.z() < z_end)));
   }
 }
 
@@ -76,14 +76,14 @@ TEST_CASE("Count Sort", "[sort]") {
     vec_gen.next();
   }
 
-  std::vector<particles::Vec3> orig_pos = ps.pos;
+  std::vector<Vec3> orig_pos = ps.pos;
   particles::count_sort(ps);
 
   REQUIRE_THAT(orig_pos, Catch::Matchers::UnorderedEquals(ps.pos));
 
   std::string info;
   for (const auto &pos : ps.pos) {
-    info += std::format("{}: ({}, {}, {})  ", particles::cell_index(pos, grid_width), pos.x, pos.y, pos.z);
+    info += std::format("{}: ({}, {}, {})  ", particles::cell_index(pos, grid_width), pos.x(), pos.y(), pos.z());
   }
   INFO(info);
 
@@ -102,7 +102,7 @@ TEST_CASE("Fetch Neighbours", "[sort]") {
 
   SECTION("Same Bucket") {
     for (int i = 0; i < ps.size(); i++) {
-      ps.pos[i] = particles::Vec3(0 + (0.01 * i), 0, 0);
+      ps.pos[i] = Vec3{0.0f + (0.01f * i), 0, 0};
     }
   }
 
@@ -117,7 +117,7 @@ TEST_CASE("Fetch Neighbours", "[sort]") {
     ps.pos[6] = Vec3{-1, -0.6, -0.6};
     ps.pos[7] = Vec3{-0.6, -0.6, -0.6};
 
-    ps.pos[8] = particles::Vec3(-1, -1, 1); // Not a neighbour to index 0
+    ps.pos[8] = Vec3{-1, -1, 1}; // Not a neighbour to index 0
 
     particles::count_sort(ps);
     particles::Particles neighbours;
