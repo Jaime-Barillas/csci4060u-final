@@ -107,15 +107,15 @@ TEST_CASE("Fetch Neighbours", "[sort]") {
   }
 
   SECTION("Low extreme") {
-    ps.pos[0] = particles::Vec3(-1, -1, -1);
-    ps.pos[1] = particles::Vec3(-0.7, -1, -1);
-    ps.pos[2] = particles::Vec3(-1, -0.7, -1);
-    ps.pos[3] = particles::Vec3(-0.7, -0.7, -1);
+    ps.pos[0] = Vec3{-1, -1, -1};
+    ps.pos[1] = Vec3{-0.6, -1, -1};
+    ps.pos[2] = Vec3{-1, -0.6, -1};
+    ps.pos[3] = Vec3{-0.6, -0.6, -1};
 
-    ps.pos[4] = particles::Vec3(-1, -1, -0.7);
-    ps.pos[5] = particles::Vec3(-0.7, -1, -0.7);
-    ps.pos[6] = particles::Vec3(-1, -0.7, -0.7);
-    ps.pos[7] = particles::Vec3(-0.7, -0.7, -0.7);
+    ps.pos[4] = Vec3{-1, -1, -0.6};
+    ps.pos[5] = Vec3{-0.6, -1, -0.6};
+    ps.pos[6] = Vec3{-1, -0.6, -0.6};
+    ps.pos[7] = Vec3{-0.6, -0.6, -0.6};
 
     ps.pos[8] = particles::Vec3(-1, -1, 1); // Not a neighbour to index 0
 
