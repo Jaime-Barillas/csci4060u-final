@@ -8,23 +8,6 @@
 #include <vector>
 
 namespace particles {
-  Vec3 Vec3::normalized() {
-    float length = std::sqrt((x * x) + (y * y) + (z * z));
-    return { x / length, y / length, z / length};
-  }
-
-  void Vec3::negate() {
-    x = -x;
-    y = -y;
-    z = -z;
-  }
-
-  void Vec3::operator*=(float scalar) {
-    x *= scalar;
-    y *= scalar;
-    z *= scalar;
-  }
-
   void Particles::resize(size_t new_size) {
     pos.resize(new_size);
     vel.resize(new_size);
@@ -53,15 +36,15 @@ namespace particles {
       uint32_t x = i % length;
       uint32_t y = (i / length) % length;
       uint32_t z = i / (length * length);
-      particles.pos[i] = {
-        .x = start + (x * step),
-        .y = start + (y * step),
-        .z = start + (z * step),
+      particles.pos[i] = Vec3{
+        start + (x * step),
+        start + (y * step),
+        start + (z * step),
       };
-      particles.vel[i] = {.x = 0, .y = 0, .z = 0};
-      particles.pforce[i] = {.x = 0, .y = 0, .z = 0};
-      particles.vforce[i] = {.x = 0, .y = 0, .z = 0};
-      particles.eforce[i] = {.x = 0, .y = 0, .z = 0};
+      particles.vel[i] = Vec3{0, 0, 0};
+      particles.pforce[i] = Vec3{0, 0, 0};
+      particles.vforce[i] = Vec3{0, 0, 0};
+      particles.eforce[i] = Vec3{0, 0, 0};
       particles.density[i] = 0;
       particles.pressure[i] = 0;
     }
@@ -71,10 +54,7 @@ namespace particles {
   float kernel<PolyKernel>(Vec3 &point, Vec3 &particle) {
     static constexpr float COEFFICIENT = 315.0f / (64 * std::numbers::pi_v<float> * util::pow(particles::SUPPORT, 9));
 
-    float dx = particle.x - point.x;
-    float dy = particle.y - point.y;
-    float dz = particle.z - point.z;
-    float distsqr = (dx * dx) + (dy * dy) + (dz * dz);
+    float distsqr = (particle - point).length_squared();
     float q = (particles::SUPPORT * particles::SUPPORT) - distsqr;
 
     // Check if within SUPPORT radius.
@@ -86,10 +66,8 @@ namespace particles {
   Vec3 kernel<SpikyGradKernel>(Vec3 &point, Vec3 &particle) {
     static constexpr float COEFFICIENT = -45.0f / (std::numbers::pi_v<float> * util::pow(particles::SUPPORT, 6));
 
-    float dx = particle.x - point.x;
-    float dy = particle.y - point.y;
-    float dz = particle.z - point.z;
-    float dist = std::sqrtf((dx * dx) + (dy * dy) + (dz * dz));
+    Vec3 difference = particle - point;
+    float dist = difference.length();
     float q = particles::SUPPORT - dist;
 
     if (q < 0 || dist <= 0) {
@@ -98,21 +76,16 @@ namespace particles {
 
     q = q * q * COEFFICIENT;
 
-    return Vec3{
-      .x = q * (dx / dist),
-      .y = q * (dy / dist),
-      .z = q * (dz / dist),
-    };
+    // Manually normalizing (div by dist) avoids an extra sqrt().
+    difference *= q * (1.0f / dist);
+    return difference;
   }
 
   template<>
   float kernel<ViscLaplKernel>(Vec3 &point, Vec3 &particle) {
     static constexpr float COEFFICIENT = 45.0f / (std::numbers::pi_v<float> * util::pow(particles::SUPPORT, 6));
 
-    float dx = particle.x - point.x;
-    float dy = particle.y - point.y;
-    float dz = particle.z - point.z;
-    float dist = std::sqrtf((dx * dx) + (dy * dy) + (dz * dz));
+    float dist = (particle - point).length();
     float q = particles::SUPPORT - dist;
 
     q = (q < 0) ? 0 : q;
@@ -125,9 +98,9 @@ namespace particles {
     const float SIM_AREA_WIDTH = particles::RIGHT_BOUND - particles::LEFT_BOUND;
     const float SIM_AREA_HALF_WIDTH = particles::RIGHT_BOUND;
 
-    x = static_cast<uint32_t>((pos.x + SIM_AREA_HALF_WIDTH) / SIM_AREA_WIDTH * grid_width);
-    y = static_cast<uint32_t>((pos.y + SIM_AREA_HALF_WIDTH) / SIM_AREA_WIDTH * grid_width);
-    z = static_cast<uint32_t>((pos.z + SIM_AREA_HALF_WIDTH) / SIM_AREA_WIDTH * grid_width);
+    x = static_cast<uint32_t>((pos.x() + SIM_AREA_HALF_WIDTH) / SIM_AREA_WIDTH * grid_width);
+    y = static_cast<uint32_t>((pos.y() + SIM_AREA_HALF_WIDTH) / SIM_AREA_WIDTH * grid_width);
+    z = static_cast<uint32_t>((pos.z() + SIM_AREA_HALF_WIDTH) / SIM_AREA_WIDTH * grid_width);
 
     // Handle boundary when x, y, or z are at their top bounds (e.x. 1.0 for
     // sim bounds -1.0 to 1.0). When this happens, the above calculation will
@@ -260,15 +233,14 @@ namespace particles {
 
     Vec3 pressure_kernel_temp;
     for (size_t i = 0; i < particle_count; i++) {
-      Vec3 pressure_temp = { 0, 0, 0 };
+      Vec3 pressure_temp{ 0, 0, 0 };
       fetch_neighbours(ps, i, grid_width, neighbours);
 
       for (size_t j = 0; j < neighbours.size(); j++) {
         pressure_kernel_temp = kernel<SpikyGradKernel>(ps.pos[i], neighbours.pos[j]);
         float pressure_factor = (ps.pressure[i] + neighbours.pressure[j]) / (2 * neighbours.density[j]);
-        pressure_temp.x += pressure_kernel_temp.x * pressure_factor;
-        pressure_temp.y += pressure_kernel_temp.y * pressure_factor;
-        pressure_temp.z += pressure_kernel_temp.z * pressure_factor;
+        pressure_kernel_temp *= pressure_factor;
+        pressure_temp += pressure_kernel_temp;
       }
 
       ps.pforce[i] = pressure_temp;
@@ -282,17 +254,15 @@ namespace particles {
     
     float viscosity_kernel_temp;
     for (size_t i = 0; i < particle_count; i++) {
-      particles::Vec3 viscosity_temp = { 0, 0, 0 };
+      Vec3 viscosity_temp{ 0, 0, 0 };
       fetch_neighbours(ps, i, grid_width, neighbours);
 
       for (size_t j = 0; j < neighbours.size(); j++) {
         viscosity_kernel_temp = kernel<ViscLaplKernel>(ps.pos[i], neighbours.pos[j]);
-        float viscosity_factor_x = (neighbours.vel[j].x - ps.vel[i].x) / neighbours.density[j];
-        float viscosity_factor_y = (neighbours.vel[j].y - ps.vel[i].y) / neighbours.density[j];
-        float viscosity_factor_z = (neighbours.vel[j].z - ps.vel[i].z) / neighbours.density[j];
-        viscosity_temp.x += VISCOSITY_CONSTANT * viscosity_kernel_temp * viscosity_factor_x;
-        viscosity_temp.y += VISCOSITY_CONSTANT * viscosity_kernel_temp * viscosity_factor_y;
-        viscosity_temp.z += VISCOSITY_CONSTANT * viscosity_kernel_temp * viscosity_factor_z;
+        Vec3 viscosity_factor = (neighbours.vel[j] - ps.vel[i]);
+        viscosity_factor *= (1.0f / neighbours.density[j]);
+        viscosity_factor *= VISCOSITY_CONSTANT * viscosity_kernel_temp;
+        viscosity_temp += viscosity_factor;
       }
 
       ps.vforce[i] = viscosity_temp;
@@ -308,12 +278,12 @@ namespace particles {
       ps.eforce[i].negate();
       ps.eforce[i] *= particles::GRAVITY_STRENGTH;
       */
-      bool flow_up = ps.pos[i].y < 0
-                   && std::abs(ps.pos[i].x) < FOUNTAIN_WIDTH
-                   && std::abs(ps.pos[i].z) < FOUNTAIN_WIDTH;
-      ps.eforce[i] = { 0, -GRAVITY_STRENGTH, 0 };
+      bool flow_up = ps.pos[i].y() < 0
+                   && std::abs(ps.pos[i].x()) < FOUNTAIN_WIDTH
+                   && std::abs(ps.pos[i].z()) < FOUNTAIN_WIDTH;
+      ps.eforce[i] = Vec3{ 0, -GRAVITY_STRENGTH, 0 };
       if (flow_up) {
-        ps.eforce[i].y = GRAVITY_STRENGTH * FOUNTAIN_STRENGTH;
+        ps.eforce[i] = Vec3{ 0, GRAVITY_STRENGTH * FOUNTAIN_STRENGTH, 0 };
       }
     }
   }
@@ -321,35 +291,29 @@ namespace particles {
   void integrate(Particles &ps) {
     size_t particle_count = ps.size();
 
-    particles::Vec3 acceleration;
+    Vec3 acceleration;
     for (size_t i = 0; i < particle_count; i++) {
       // F = ma <=> a = F/m, m = 1.0 => a = F
-      acceleration.x = ps.pforce[i].x + ps.vforce[i].x + ps.eforce[i].x;
-      acceleration.y = ps.pforce[i].y + ps.vforce[i].y + ps.eforce[i].y;
-      acceleration.z = ps.pforce[i].z + ps.vforce[i].z + ps.eforce[i].z;
+      acceleration = ps.pforce[i] + ps.vforce[i] + ps.eforce[i];
 
       // v = a * dt;
-      ps.vel[i].x += acceleration.x * (1.0f / 60); // FIXME: actually use delta time.
-      ps.vel[i].y += acceleration.y * (1.0f / 60);
-      ps.vel[i].z += acceleration.z * (1.0f / 60);
+      ps.vel[i] += acceleration * (1.0f / 60); // FIXME: actually use delta time.
 
       // d = v * dt;
-      ps.pos[i].x += ps.vel[i].x * (1.0f / 60);
-      ps.pos[i].y += ps.vel[i].y * (1.0f / 60);
-      ps.pos[i].z += ps.vel[i].z * (1.0f / 60);
+      ps.pos[i] += ps.vel[i] * (1.0f / 60);
 
       // Boundary conditions.
-      if (ps.pos[i].x < LEFT_BOUND || ps.pos[i].x > RIGHT_BOUND) {
-        ps.pos[i].x = std::clamp<float>(ps.pos[i].x, LEFT_BOUND, RIGHT_BOUND);
-        ps.vel[i].x *= -0.5;
+      if (ps.pos[i].x() < LEFT_BOUND || ps.pos[i].x() > RIGHT_BOUND) {
+        ps.pos[i].x(std::clamp<float>(ps.pos[i].x(), LEFT_BOUND, RIGHT_BOUND));
+        ps.vel[i].x(ps.vel[i].x() * -0.5);
       }
-      if (ps.pos[i].y < LOWER_BOUND || ps.pos[i].y > UPPER_BOUND) {
-        ps.pos[i].y = std::clamp<float>(ps.pos[i].y, LOWER_BOUND, UPPER_BOUND);
-        ps.vel[i].y *= -0.5;
+      if (ps.pos[i].y() < LOWER_BOUND || ps.pos[i].y() > UPPER_BOUND) {
+        ps.pos[i].y(std::clamp<float>(ps.pos[i].y(), LOWER_BOUND, UPPER_BOUND));
+        ps.vel[i].y(ps.vel[i].y() * -0.5);
       }
-      if (ps.pos[i].z < BACKWARD_BOUND || ps.pos[i].z > FORWARD_BOUND) {
-        ps.pos[i].z = std::clamp<float>(ps.pos[i].z, BACKWARD_BOUND, FORWARD_BOUND);
-        ps.vel[i].z *= -0.5;
+      if (ps.pos[i].z() < BACKWARD_BOUND || ps.pos[i].z() > FORWARD_BOUND) {
+        ps.pos[i].z(std::clamp<float>(ps.pos[i].z(), BACKWARD_BOUND, FORWARD_BOUND));
+        ps.vel[i].z(ps.vel[i].z() * -0.5);
       }
     }
   }

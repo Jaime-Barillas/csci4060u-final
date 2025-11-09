@@ -1,6 +1,8 @@
 set(
   CPP_LIB_SRCS
   "${CMAKE_CURRENT_SOURCE_DIR}/particles.cpp"
+  "${CMAKE_CURRENT_SOURCE_DIR}/sim.cpp"
+  "${CMAKE_CURRENT_SOURCE_DIR}/timer.cpp"
 )
 
 # Sequential C program

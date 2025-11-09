@@ -1,6 +1,6 @@
 #include "lib.h"
 #include "matrix.h"
-#include "Vec3.h"
+#include "vec.h"
 #include <expected>
 #include <filesystem>
 #include <SDL3/SDL.h>
@@ -122,7 +122,7 @@ namespace libcommon {
   libcommon_return_t _setup_gpu_buffers(SDLCtx *ctx) {
     uint32_t data_size = 0;
 
-    data_size = static_cast<uint32_t>(sizeof(Vec3) * ctx->particle_count);
+    data_size = static_cast<uint32_t>(sizeof(Vec4) * ctx->particle_count);
 
     SDL_GPUTransferBufferCreateInfo ti = {
       .usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD,
@@ -497,7 +497,7 @@ namespace libcommon {
       SDL_GPUBufferRegion dest = {
         .buffer = ctx->bufs.point_sprites.b,
         .offset = 0,
-        .size = static_cast<uint32_t>(sizeof(Vec3) * ctx->particle_count),
+        .size = static_cast<uint32_t>(sizeof(Vec4) * ctx->particle_count),
       };
       SDL_GPUCopyPass *upload_particles_pass = SDL_BeginGPUCopyPass(cmds);
       SDL_UploadToGPUBuffer(upload_particles_pass, &source, &dest, true);

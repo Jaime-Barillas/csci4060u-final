@@ -2,7 +2,7 @@
 
 #include <concepts>
 #include <cstdint>
-#include <type_traits>
+#include <libcommon/vec.h>
 #include <vector>
 
 namespace particles {
@@ -23,19 +23,6 @@ namespace particles {
   constexpr float UPPER_BOUND = 1.0;
   constexpr float BACKWARD_BOUND = -1.0;
   constexpr float FORWARD_BOUND = 1.0;
-
-  struct Vec3 {
-    float x;
-    float y;
-    float z;
-
-    Vec3 normalized();
-
-    void negate();
-    void operator*=(float scalar);
-  };
-
-  static_assert(std::is_standard_layout_v<Vec3>, "particles::Vec3 must have standard layout");
 
   struct Particles {
     std::vector<Vec3> pos;

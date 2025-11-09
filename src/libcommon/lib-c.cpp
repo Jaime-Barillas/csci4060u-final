@@ -2,7 +2,7 @@
 
 #include "lib.h"
 #include "SDL3/SDL_gpu.h"
-#include "Vec3.h"
+#include "vec.h"
 #include <cstdint>
 #include <utility>
 
