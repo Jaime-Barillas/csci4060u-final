@@ -44,7 +44,8 @@
   exe
   {:doc "Run the program (args: <prog-name>, opts: --release)"
    :depends [-build-path]
-   :task (let [prog (first (:args args))]
+   :task (let [prog (first (:args args))
+               exe-args (rest (:args args))]
            (when (nil? prog)
              (println "Available programs:")
              (some->>
@@ -59,8 +60,8 @@
 
            (let [prog-path (fs/path -build-path prog)
                  cmd (if (-> args :opts :bench)
-                       [prog-path "--bench"]
-                       [prog-path])]
+                       (into [prog-path "--bench"] exe-args)
+                       (into [prog-path] exe-args))]
              (if (fs/exists? prog-path)
                (->> cmd
                  (apply proc/shell {:continue true})
