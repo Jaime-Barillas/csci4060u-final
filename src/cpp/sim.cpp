@@ -54,6 +54,8 @@ void Sim::init() {
 void Sim::run_loop() {
   bool run = true;
   while (run) {
+    run = libcommon::update(sdl_ctx);
+
     timer.record_start();
     update();
     timer.record_end();
@@ -70,8 +72,6 @@ void Sim::run_loop() {
 }
 
 void Sim::update() {
-  libcommon::update(sdl_ctx);
-
   // 1. Model View matrix.
   // degrees += 0.025f;
   sdl_ctx->uniforms.gen_point_sprites.model_view = libcommon::matrix::translate_z(2.0f)
