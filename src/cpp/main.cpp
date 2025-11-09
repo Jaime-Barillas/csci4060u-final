@@ -3,10 +3,12 @@
 #include <print>
 
 
+constexpr uint32_t DEFAULT_PARTICLE_COUNT = 1024;
+
 int main(int argc, const char **argv) {
   std::filesystem::path exe_path(argv[0]);
   bool bench_mode = false;
-  uint32_t particle_count;
+  uint32_t particle_count = DEFAULT_PARTICLE_COUNT;
 
   for (size_t i = 1; i < argc; i++) {
     std::string_view arg(argv[i]);
@@ -18,7 +20,7 @@ int main(int argc, const char **argv) {
       // If the entire arg was not consumed, default to a known good value.
       // FIXME: Allow non-multiples of 64.
       if (res.ptr != arg.end() || particle_count % 64 != 0) {
-        particle_count = 1024;
+        particle_count = DEFAULT_PARTICLE_COUNT;
       }
     }
   }
