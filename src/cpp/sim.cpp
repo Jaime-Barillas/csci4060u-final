@@ -1,5 +1,8 @@
-#include "particles.h"
 #include "sim.h"
+
+#include "neighbours.h"
+#include "particles.h"
+#include "procs.h"
 #include "timer.h"
 #include <cstdint>
 #include <filesystem>
@@ -7,13 +10,13 @@
 #include <libcommon/lib.h>
 #include <libcommon/matrix.h>
 #include <libcommon/vec.h>
-#include <SDL3/SDL_gpu.h>
 #include <print>
+#include <SDL3/SDL_gpu.h>
 #include <stdexcept>
 
 
 Sim::Sim(std::filesystem::path exe_path, uint32_t particle_count, bool bench_mode)
-: sim_opts{bench_mode, particle_count, particles::PARTICLE_RADIUS},
+: sim_opts{bench_mode, particle_count, PARTICLE_RADIUS, GAS_CONSTANT, REST_DENSITY, SUPPORT, VISCOSITY_CONSTANT},
   exe_path{exe_path},
   timer(BENCH_LENGTH) {
     ps.resize(sim_opts.particle_count);
@@ -48,7 +51,7 @@ void Sim::init() {
 
   sdl_ctx = res.value();
   sdl_ctx->uniforms.gen_point_sprites.particle_radius = sim_opts.particle_radius;
-  particles::reset(ps, sim_opts.particle_count, X_BOUNDS.x(), X_BOUNDS.y());
+  ps.reset(sim_opts.particle_count, X_BOUNDS.x(), X_BOUNDS.y());
 }
 
 void Sim::run_loop() {
@@ -78,10 +81,14 @@ void Sim::update() {
                                                  * libcommon::matrix::rotation_x(-20);
 
   // 2. Simulation.
-  particles::count_sort(ps);
-  particles::calculate_density_pressure(ps);
-  particles::calculate_pressure_forces(ps);
-  particles::calculate_viscosity_forces(ps);
+  ns.process(ps, sim_opts);
+  // TODO: Try these again.
+  // density_calculator.process(ps, ns, sim_opts);
+  // pressure_calculator.process(ps, ns, sim_opts);
+  // viscosity_calculator.process(ps, ns, sim_opts);
+  particles::calculate_density_pressure(ps, ns, sim_opts);
+  particles::calculate_pressure_forces(ps, ns, sim_opts);
+  particles::calculate_viscosity_forces(ps, ns, sim_opts);
   particles::calculate_external_forces(ps);
   particles::integrate(ps);
 }

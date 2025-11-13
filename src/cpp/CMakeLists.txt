@@ -3,6 +3,8 @@ set(
   "${CMAKE_CURRENT_SOURCE_DIR}/particles.cpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/sim.cpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/timer.cpp"
+  "${CMAKE_CURRENT_SOURCE_DIR}/neighbours.cpp"
+  "${CMAKE_CURRENT_SOURCE_DIR}/procs.cpp"
 )
 
 # Sequential C program

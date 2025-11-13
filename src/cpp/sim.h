@@ -1,6 +1,8 @@
 #pragma once
 
+#include "neighbours.h"
 #include "particles.h"
+#include "sim_opts.h"
 #include "timer.h"
 #include <cstdint>
 #include <filesystem>
@@ -8,24 +10,15 @@
 #include <libcommon/vec.h>
 
 
-constexpr uint32_t BENCH_LENGTH = 300; // frames
-constexpr Vec2 X_BOUNDS{-1.0f, 1.0f};
-constexpr Vec2 Y_BOUNDS{-1.0f, 1.0f};
-constexpr Vec2 Z_BOUNDS{-1.0f, 1.0f};
-
-struct SimOpts {
-  bool bench_mode;
-  uint32_t particle_count;
-  float particle_radius;
-};
-
 class Sim {
   std::filesystem::path exe_path;
   FrameTimer timer;
 
   SimOpts sim_opts;
   libcommon::SDLCtx *sdl_ctx;
-  particles::Particles ps;
+  Particles ps;
+
+  Neighbours ns;
 
   static bool copy_particles(libcommon::SDLCtx *sdl_ctx, SDL_GPUTransferBuffer *tbuf, const void *sim_ctx);
   void update();

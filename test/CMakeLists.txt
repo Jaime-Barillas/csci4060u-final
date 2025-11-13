@@ -1,9 +1,9 @@
 set(
   CPP_SRCS
-  "${CMAKE_CURRENT_SOURCE_DIR}/main.cpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/generators.cpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/misc_declarations.cpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/libcommon/test_vec.cpp"
+  "${CMAKE_CURRENT_SOURCE_DIR}/cpp/test_neighbours.cpp"
 )
 
 add_executable(
