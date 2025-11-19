@@ -5,12 +5,7 @@
 #include <cmath>
 #include <cstdint>
 
-Neighbours::Neighbours() {
-  for (size_t i = 0; i < 4; i++) {
-    pool.push_back(new Particles);
-  }
-  in_use.reserve(4);
-}
+Neighbours::Neighbours() { }
 
 void Neighbours::cell_indexes(Vec3 pos, uint32_t grid_width, uint32_t &x, uint32_t &y, uint32_t &z) const {
   // NOTE: Cube shaped simulation area centered on origin.
@@ -82,35 +77,6 @@ void Neighbours::sort(Particles &ps, uint32_t particle_count, uint32_t grid_widt
   }
 }
 
-Particles *Neighbours::get_free_neighbour_list() {
-  if (pool.size() == 0) {
-    pool.push_back(new Particles);
-  }
-
-  Particles *neighbours = pool.back();
-  pool.pop_back();
-  in_use.push_back(neighbours);
-  neighbours->clear();
-
-  return neighbours;
-}
-
-void Neighbours::return_neighbour_list(Particles *neighbours) {
-  Particles *lent_neighbours = nullptr;
-
-  for (auto it = in_use.begin(); it != in_use.end(); it++) {
-    if (*it == neighbours) {
-      lent_neighbours = *it;
-      in_use.erase(it);
-      break;
-    }
-  }
-
-  if (lent_neighbours != nullptr) {
-    pool.push_back(lent_neighbours);
-  }
-}
-
 void Neighbours::process(Particles &ps, const SimOpts & opts) {
   uint32_t grid_width = std::floorf((X_BOUNDS.y() - X_BOUNDS.x()) / SUPPORT);
   uint32_t cell_count = grid_width * grid_width * grid_width;
@@ -144,13 +110,11 @@ void Neighbours::neighbours_near(const Particles &ps, Vec3 pos, const SimOpts &o
   y_end -= (y_end == grid_width);
   z_end -= (z_end == grid_width);
 
-  // Particles *neighbours = get_free_neighbour_list();
   neighbours.clear();
 
   for (int32_t k = z_start; k <= z_end; k++) {
     for (int32_t j = y_start; j <= y_end; j++) {
       for (int32_t i = x_start; i <= x_end; i++) {
-
         uint32_t cell = i + (j * grid_width) + (k * grid_width * grid_width);
         uint32_t start_idx = cell_starts[cell];
         uint32_t end_idx = cell_starts[cell + 1];
@@ -161,6 +125,4 @@ void Neighbours::neighbours_near(const Particles &ps, Vec3 pos, const SimOpts &o
       }
     }
   }
-
-  // return neighbours;
 }
