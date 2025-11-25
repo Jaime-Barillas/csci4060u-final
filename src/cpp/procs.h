@@ -18,12 +18,19 @@ namespace particles {
 
   template<typename T>
   requires Kernel<T>
-  typename T::return_type kernel(Vec3 &pos, Vec3 &particle);
+  typename T::return_type kernel(
+    float point_x,
+    float point_y,
+    float point_z,
+    float particle_x,
+    float particle_y,
+    float particle_z
+  );
 
   // Force Computation Functions.
-  void calculate_density_pressure(Particles &ps, Neighbours &ns, const SimOpts &opts);
-  void calculate_pressure_forces(Particles &ps, Neighbours &ns, const SimOpts &opts);
-  void calculate_viscosity_forces(Particles &ps, Neighbours &ns, const SimOpts &opts);
-  void calculate_external_forces(Particles &ps);
-  void integrate(Particles &ps);
+  void calculate_density_pressure(Particles &input, Particles &output, Neighbours &ns, const SimOpts &opts);
+  void calculate_pressure_forces(Particles &input, Particles &output, Neighbours &ns, const SimOpts &opts);
+  void calculate_viscosity_forces(Particles &input, Particles &output, Neighbours &ns, const SimOpts &opts);
+  void calculate_external_forces(Particles &input, Particles &output);
+  void integrate(Particles &output);
 }

@@ -4,18 +4,20 @@
 #include "sim_opts.h"
 #include <cmath>
 #include <cstdint>
+#include <utility>
+#include <vector>
 
 Neighbours::Neighbours() { }
 
-void Neighbours::cell_indexes(Vec3 pos, uint32_t grid_width, uint32_t &x, uint32_t &y, uint32_t &z) const {
+void Neighbours::cell_indexes(float px, float py, float pz, uint32_t grid_width, uint32_t &x, uint32_t &y, uint32_t &z) const {
   // NOTE: Cube shaped simulation area centered on origin.
   //       Need to offset `pos` since calculations rely on positive numbers.
   const float SIM_AREA_WIDTH = X_BOUNDS.y() - X_BOUNDS.x();
   const float SIM_AREA_HALF_WIDTH = X_BOUNDS.y();
 
-  x = static_cast<uint32_t>((pos.x() + SIM_AREA_HALF_WIDTH) / SIM_AREA_WIDTH * grid_width);
-  y = static_cast<uint32_t>((pos.y() + SIM_AREA_HALF_WIDTH) / SIM_AREA_WIDTH * grid_width);
-  z = static_cast<uint32_t>((pos.z() + SIM_AREA_HALF_WIDTH) / SIM_AREA_WIDTH * grid_width);
+  x = static_cast<uint32_t>((px + SIM_AREA_HALF_WIDTH) / SIM_AREA_WIDTH * grid_width);
+  y = static_cast<uint32_t>((py + SIM_AREA_HALF_WIDTH) / SIM_AREA_WIDTH * grid_width);
+  z = static_cast<uint32_t>((pz + SIM_AREA_HALF_WIDTH) / SIM_AREA_WIDTH * grid_width);
 
   // Handle boundary when x, y, or z are at their top bounds (ex. 1.0 for
   // sim bounds -1.0 to 1.0). When this happens, the above calculation will
@@ -26,21 +28,21 @@ void Neighbours::cell_indexes(Vec3 pos, uint32_t grid_width, uint32_t &x, uint32
   z -= (z == grid_width);
 }
 
-uint32_t Neighbours::cell_index(Vec3 pos, uint32_t grid_width) const {
+uint32_t Neighbours::cell_index(float px, float py, float pz, uint32_t grid_width) const {
   uint32_t x, y, z;
 
-  cell_indexes(pos, grid_width, x, y, z);
+  cell_indexes(px, py, pz, grid_width, x, y, z);
 
   return x + (grid_width * y) + (grid_width * grid_width * z);
 }
 
-void Neighbours::sort(Particles &ps, uint32_t particle_count, uint32_t grid_width) {
+void Neighbours::sort(Particles &input, Particles &output, uint32_t particle_count, uint32_t grid_width) {
   uint32_t bin_count = grid_width * grid_width * grid_width;
 
   for (auto &c : count_array) { c = 0; }
 
   for (size_t i = 0; i < particle_count; i++) {
-    uint32_t j = cell_index(ps.pos[i], grid_width);
+    uint32_t j = cell_index(input.pos_x[i], input.pos_y[i], input.pos_z[i], grid_width);
     count_array[j] += 1;
   }
 
@@ -55,43 +57,46 @@ void Neighbours::sort(Particles &ps, uint32_t particle_count, uint32_t grid_widt
   }
 
   for (int32_t i = (particle_count - 1); i >= 0; i--) {
-    uint32_t j = cell_index(ps.pos[i], grid_width);
+    uint32_t j = cell_index(input.pos_x[i], input.pos_y[i], input.pos_z[i], grid_width);
     count_array[j] -= 1;
-    sorted.pos[count_array[j]] = ps.pos[i];
-    sorted.vel[count_array[j]] = ps.vel[i];
-    sorted.pforce[count_array[j]] = ps.pforce[i];
-    sorted.vforce[count_array[j]] = ps.vforce[i];
-    sorted.eforce[count_array[j]] = ps.eforce[i];
-    sorted.density[count_array[j]] = ps.density[i];
-    sorted.pressure[count_array[j]] = ps.pressure[i];
+    output.pos_x[count_array[j]] = input.pos_x[i];
+    output.pos_y[count_array[j]] = input.pos_y[i];
+    output.pos_z[count_array[j]] = input.pos_z[i];
+    output.vel_x[count_array[j]] = input.vel_x[i];
+    output.vel_y[count_array[j]] = input.vel_y[i];
+    output.vel_z[count_array[j]] = input.vel_z[i];
+    output.forces_x[count_array[j]] = input.forces_x[i];
+    output.forces_y[count_array[j]] = input.forces_y[i];
+    output.forces_z[count_array[j]] = input.forces_z[i];
+    output.density[count_array[j]] = input.density[i];
+    output.pressure[count_array[j]] = input.pressure[i];
   }
 
   for (size_t i = 0; i < particle_count; i++) {
-    ps.pos[i] = sorted.pos[i];
-    ps.vel[i] = sorted.vel[i];
-    ps.pforce[i] = sorted.pforce[i];
-    ps.vforce[i] = sorted.vforce[i];
-    ps.eforce[i] = sorted.eforce[i];
-    ps.density[i] = sorted.density[i];
-    ps.pressure[i] = sorted.pressure[i];
+    input.pos_x[i] = output.pos_x[i];
+    input.pos_y[i] = output.pos_y[i];
+    input.pos_z[i] = output.pos_z[i];
+    input.vel_x[i] = output.vel_x[i];
+    input.vel_y[i] = output.vel_y[i];
+    input.vel_z[i] = output.vel_z[i];
   }
 }
 
-void Neighbours::process(Particles &ps, const SimOpts & opts) {
+void Neighbours::process(Particles &input, Particles &output, const SimOpts &opts) {
   uint32_t grid_width = std::floorf((X_BOUNDS.y() - X_BOUNDS.x()) / SUPPORT);
   uint32_t cell_count = grid_width * grid_width * grid_width;
 
-  sorted.resize(opts.particle_count);
+  output.resize(opts.particle_count);
   count_array.resize(cell_count + 1);
   cell_starts.resize(cell_count + 1);
 
-  sort(ps, opts.particle_count, grid_width);
+  sort(input, output, opts.particle_count, grid_width);
 }
 
-void Neighbours::neighbours_near(const Particles &ps, Vec3 pos, const SimOpts &opts, Particles &neighbours) {
+void Neighbours::neighbours_near(const Particles &ps, float px, float py, float pz, const SimOpts &opts, std::vector<std::pair<uint32_t, uint32_t>> &neighbours) {
   uint32_t grid_width = std::floorf((X_BOUNDS.y() - X_BOUNDS.x()) / opts.support);
   uint32_t x, y, z;
-  cell_indexes(pos, grid_width, x, y, z);
+  cell_indexes(px, py, pz, grid_width, x, y, z);
 
   int32_t x_start = static_cast<int32_t>(x) - 1;
   int32_t y_start = static_cast<int32_t>(y) - 1;
@@ -118,10 +123,7 @@ void Neighbours::neighbours_near(const Particles &ps, Vec3 pos, const SimOpts &o
         uint32_t cell = i + (j * grid_width) + (k * grid_width * grid_width);
         uint32_t start_idx = cell_starts[cell];
         uint32_t end_idx = cell_starts[cell + 1];
-        neighbours.pos.insert(neighbours.pos.end(), ps.pos.begin() + start_idx, ps.pos.begin() + end_idx);
-        neighbours.vel.insert(neighbours.vel.end(), ps.vel.begin() + start_idx, ps.vel.begin() + end_idx);
-        neighbours.density.insert(neighbours.density.end(), ps.density.begin() + start_idx, ps.density.begin() + end_idx);
-        neighbours.pressure.insert(neighbours.pressure.end(), ps.pressure.begin() + start_idx, ps.pressure.begin() + end_idx);
+        neighbours.push_back(std::pair<uint32_t, uint32_t>{start_idx, end_idx});
       }
     }
   }

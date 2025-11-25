@@ -24,11 +24,9 @@ constexpr float BACKWARD_BOUND = -1.0;
 constexpr float FORWARD_BOUND = 1.0;
 
 struct Particles {
-  std::vector<Vec3> pos;
-  std::vector<Vec3> vel;
-  std::vector<Vec3> pforce; // Pressure forces
-  std::vector<Vec3> vforce; // Viscosity forces
-  std::vector<Vec3> eforce; // External forces
+  std::vector<float> pos_x, pos_y, pos_z;
+  std::vector<float> vel_x, vel_y, vel_z;
+  std::vector<float> forces_x, forces_y, forces_z;
   std::vector<float> density;
   std::vector<float> pressure;
 

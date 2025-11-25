@@ -13,6 +13,9 @@ add_subdirectory(subprojects/sdl3 EXCLUDE_FROM_ALL)
 add_subdirectory(subprojects/sdl3_ttf EXCLUDE_FROM_ALL)
 add_subdirectory(subprojects/catch2 EXCLUDE_FROM_ALL)
 
+add_compile_options(
+  -march=native
+)
 add_subdirectory(src/libcommon)
 add_subdirectory(src/cpp)
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")

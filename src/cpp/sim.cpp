@@ -13,13 +13,23 @@
 #include <print>
 #include <SDL3/SDL_gpu.h>
 #include <stdexcept>
+#include <utility>
 
 
 Sim::Sim(std::filesystem::path exe_path, uint32_t particle_count, bool bench_mode)
 : sim_opts{bench_mode, particle_count, PARTICLE_RADIUS, GAS_CONSTANT, REST_DENSITY, SUPPORT, VISCOSITY_CONSTANT},
   exe_path{exe_path},
   timer(BENCH_LENGTH) {
-    ps.resize(sim_opts.particle_count);
+    ps_primary = new Particles();
+    ps_secondary = new Particles();
+
+    ps_primary->resize(sim_opts.particle_count);
+    ps_secondary->resize(sim_opts.particle_count);
+}
+
+Sim::~Sim() {
+  delete ps_primary;
+  delete ps_secondary;
 }
 
 bool Sim::copy_particles(libcommon::SDLCtx *sdl_ctx, SDL_GPUTransferBuffer *tbuf, const void *sim_ctx) {
@@ -34,7 +44,9 @@ bool Sim::copy_particles(libcommon::SDLCtx *sdl_ctx, SDL_GPUTransferBuffer *tbuf
 
   const Sim *sim = static_cast<const Sim*>(sim_ctx);
   for (int i = 0; i < sim->sim_opts.particle_count; i++) {
-    mapping[i].copy_vec3(sim->ps.pos.at(i));
+    mapping[i].data[0] = sim->ps_primary->pos_x[i];
+    mapping[i].data[1] = sim->ps_primary->pos_y[i];
+    mapping[i].data[2] = sim->ps_primary->pos_z[i];
   }
 
   SDL_UnmapGPUTransferBuffer(sdl_ctx->device, sdl_ctx->bufs.point_sprites.t);
@@ -51,7 +63,7 @@ void Sim::init() {
 
   sdl_ctx = res.value();
   sdl_ctx->uniforms.gen_point_sprites.particle_radius = sim_opts.particle_radius;
-  ps.reset(sim_opts.particle_count, X_BOUNDS.x(), X_BOUNDS.y());
+  ps_primary->reset(sim_opts.particle_count, X_BOUNDS.x(), X_BOUNDS.y());
 }
 
 void Sim::run_loop() {
@@ -81,16 +93,15 @@ void Sim::update() {
                                                  * libcommon::matrix::rotation_x(-20);
 
   // 2. Simulation.
-  ns.process(ps, sim_opts);
-  // TODO: Try these again.
-  // density_calculator.process(ps, ns, sim_opts);
-  // pressure_calculator.process(ps, ns, sim_opts);
-  // viscosity_calculator.process(ps, ns, sim_opts);
-  particles::calculate_density_pressure(ps, ns, sim_opts);
-  particles::calculate_pressure_forces(ps, ns, sim_opts);
-  particles::calculate_viscosity_forces(ps, ns, sim_opts);
-  particles::calculate_external_forces(ps);
-  particles::integrate(ps);
+  ns.process(*ps_primary, *ps_secondary, sim_opts);
+  std::swap(ps_primary, ps_secondary);
+  particles::calculate_density_pressure(*ps_primary, *ps_secondary, ns, sim_opts);
+  std::swap(ps_primary, ps_secondary);
+  particles::calculate_pressure_forces(*ps_primary, *ps_secondary, ns, sim_opts);
+  particles::calculate_viscosity_forces(*ps_primary, *ps_secondary, ns, sim_opts);
+  particles::calculate_external_forces(*ps_primary, *ps_secondary);
+  particles::integrate(*ps_secondary);
+  std::swap(ps_primary, ps_secondary);
 }
 
 void Sim::draw() {

@@ -16,7 +16,8 @@ class Sim {
 
   SimOpts sim_opts;
   libcommon::SDLCtx *sdl_ctx;
-  Particles ps;
+  Particles *ps_primary;
+  Particles *ps_secondary;
 
   Neighbours ns;
 
@@ -26,6 +27,7 @@ class Sim {
 
   public:
     Sim(std::filesystem::path exe_path, uint32_t particle_count, bool bench_mode);
+    ~Sim();
 
     void init();
     void run_loop();
