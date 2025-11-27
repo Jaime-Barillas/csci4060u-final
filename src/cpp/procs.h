@@ -28,9 +28,9 @@ namespace particles {
   );
 
   // Force Computation Functions.
-  void calculate_density_pressure(Particles &input, Particles &output, Neighbours &ns, const SimOpts &opts);
-  void calculate_pressure_forces(Particles &input, Particles &output, Neighbours &ns, const SimOpts &opts);
-  void calculate_viscosity_forces(Particles &input, Particles &output, Neighbours &ns, const SimOpts &opts);
-  void calculate_external_forces(Particles &input, Particles &output);
-  void integrate(Particles &output);
+  void calculate_density_pressure(Particles &input, Particles &output, Neighbours &ns, size_t start, size_t end, const SimOpts &opts);
+  void calculate_pressure_forces(Particles &input, Particles &output, Neighbours &ns, size_t start, size_t end, const SimOpts &opts);
+  void calculate_viscosity_forces(Particles &input, Particles &output, Neighbours &ns, size_t start, size_t end, const SimOpts &opts);
+  void calculate_external_forces(Particles &input, Particles &output, size_t start, size_t end);
+  void integrate(Particles &output, size_t start, size_t end);
 }

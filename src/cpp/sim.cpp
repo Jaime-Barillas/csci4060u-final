@@ -13,18 +13,32 @@
 #include <print>
 #include <SDL3/SDL_gpu.h>
 #include <stdexcept>
+#include <thread>
 #include <utility>
 
 
-Sim::Sim(std::filesystem::path exe_path, uint32_t particle_count, bool bench_mode)
+Sim::Sim(std::filesystem::path exe_path, uint32_t particle_count, uint32_t thread_count, bool bench_mode)
 : sim_opts{bench_mode, particle_count, PARTICLE_RADIUS, GAS_CONSTANT, REST_DENSITY, SUPPORT, VISCOSITY_CONSTANT},
   exe_path{exe_path},
+  begin(thread_count + 1),
+  complete(thread_count + 1),
   timer(BENCH_LENGTH) {
     ps_primary = new Particles();
     ps_secondary = new Particles();
 
     ps_primary->resize(sim_opts.particle_count);
     ps_secondary->resize(sim_opts.particle_count);
+
+    size_t chunk_size = sim_opts.particle_count / thread_count;
+    for (size_t i = 0; i < thread_count; i++) {
+      size_t chunk_start = chunk_size * i;
+      size_t chunk_end = chunk_size * (i + 1);
+      if (i == thread_count - 1) {
+        chunk_end = sim_opts.particle_count;
+      }
+      bounds.push_back({chunk_start, chunk_end, ForcesIntegrate});
+      workers.push_back(std::thread(&Sim::worker_fn, this, i));
+    }
 }
 
 Sim::~Sim() {
@@ -67,6 +81,10 @@ void Sim::init() {
 }
 
 void Sim::run_loop() {
+  uintptr_t ptr_primary = reinterpret_cast<uintptr_t>(ps_primary->pos_x.data());
+  size_t offset = ptr_primary % 64;
+  std::println("Offset: {}", offset);
+
   bool run = true;
   while (run) {
     run = libcommon::update(sdl_ctx);
@@ -84,26 +102,83 @@ void Sim::run_loop() {
   if (sim_opts.bench_mode) {
     std::println("{}", timer.average_millis());
   }
+
+  for (auto &worker_data : bounds) {
+    worker_data.phase = Exit;
+  }
+  begin.arrive();
+  complete.arrive();
+  for (auto &w : workers) {
+    w.join();
+  }
+}
+
+void Sim::worker_fn(size_t id) {
+  std::println("{}: start: {}, end: {}", id, bounds[id].start, bounds[id].end);
+  while(true) {
+    begin.arrive_and_wait();
+
+    switch (bounds[id].phase) {
+      case DensityPressure:
+        particles::calculate_density_pressure(*ps_primary, *ps_secondary, ns, bounds[id].start, bounds[id].end, sim_opts);
+        break;
+      case ForcesIntegrate:
+        particles::calculate_pressure_forces(*ps_primary, *ps_secondary, ns, bounds[id].start, bounds[id].end, sim_opts);
+        particles::calculate_viscosity_forces(*ps_primary, *ps_secondary, ns, bounds[id].start, bounds[id].end, sim_opts);
+        particles::calculate_external_forces(*ps_primary, *ps_secondary, bounds[id].start, bounds[id].end);
+        particles::integrate(*ps_secondary, bounds[id].start, bounds[id].end);
+        break;
+      case Exit:
+        goto exit;
+        break;
+    }
+    complete.arrive();
+  }
+
+  exit:
+  complete.arrive();
 }
 
 void Sim::update() {
-  // 1. Model View matrix.
-  // degrees += 0.025f;
+  // Model View matrix.
   sdl_ctx->uniforms.gen_point_sprites.model_view = libcommon::matrix::translate_z(2.0f)
                                                  * libcommon::matrix::rotation_x(-20);
 
-  // 2. Simulation.
+  // Particle data is stored in two buffers. Each computation reads from the
+  // primary buffer and writes to the secondary buffer. After each "phase" of
+  // computation, the pointers to the buffers are swapped. Additionally, the
+  // buffers are in SoA layout which should allow chunking the data easily
+  // for the multiple threads.
+
+  // There are three phases of computation for the simulation. After each
+  // phase, all threads of computation are synchronised to make computed
+  // values available to later phases. The first phase is currently not
+  // multithreaded.
+
+  // First: The particles are sorted according to which 3D grid cell they
+  //        belong to.
   ns.process(*ps_primary, *ps_secondary, sim_opts);
   std::swap(ps_primary, ps_secondary);
-  particles::calculate_density_pressure(*ps_primary, *ps_secondary, ns, sim_opts);
+
+  // Second: Density and pressure values are calculated for each particle.
+  for (auto &worker_data : bounds) {
+    worker_data.phase = DensityPressure;
+  }
+  begin.arrive();
+  complete.arrive_and_wait();
   std::swap(ps_primary, ps_secondary);
-  particles::calculate_pressure_forces(*ps_primary, *ps_secondary, ns, sim_opts);
-  particles::calculate_viscosity_forces(*ps_primary, *ps_secondary, ns, sim_opts);
-  particles::calculate_external_forces(*ps_primary, *ps_secondary);
-  particles::integrate(*ps_secondary);
+
+  // Third: Forces are calculated and particle positions are advanced. These
+  //        computations depend on the values calculated in the second phase.
+  for (auto &worker_data : bounds) {
+    worker_data.phase = ForcesIntegrate;
+  }
+  begin.arrive();
+  complete.arrive_and_wait();
   std::swap(ps_primary, ps_secondary);
 }
 
 void Sim::draw() {
   libcommon::draw(sdl_ctx, copy_particles, this);
 }
+

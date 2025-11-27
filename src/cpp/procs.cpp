@@ -95,12 +95,11 @@ namespace particles {
   }
 
   /*** Force Calculations ***/
-  void calculate_density_pressure(Particles &input, Particles &output, Neighbours &ns, const SimOpts &opts) {
-    static std::vector<std::pair<uint32_t, uint32_t>> neighbours;
+  void calculate_density_pressure(Particles &input, Particles &output, Neighbours &ns, size_t pstart, size_t pend, const SimOpts &opts) {
+    thread_local std::vector<std::pair<uint32_t, uint32_t>> neighbours;
     static uint32_t grid_width = std::floorf(2.0f / opts.support);
-    size_t particle_count = opts.particle_count;
 
-    for (size_t i = 0; i < particle_count; i++) {
+    for (size_t i = pstart; i < pend; i++) {
       ns.neighbours_near(input, input.pos_x[i], input.pos_y[i], input.pos_z[i], opts, neighbours);
       size_t neighbour_count = neighbours.size();
 
@@ -117,16 +116,15 @@ namespace particles {
     }
   }
 
-  void calculate_pressure_forces(Particles &input, Particles &output, Neighbours &ns, const SimOpts &opts) {
+  void calculate_pressure_forces(Particles &input, Particles &output, Neighbours &ns, size_t pstart, size_t pend, const SimOpts &opts) {
     // FIXME: Something is wrong with the calculation.
     //        Particles tend to get 'sucked' into each other.
     //        Try smaller timesteps ?
-    static std::vector<std::pair<uint32_t, uint32_t>> neighbours;
+    thread_local std::vector<std::pair<uint32_t, uint32_t>> neighbours;
     static uint32_t grid_width = std::floorf(2.0f / opts.support);
-    size_t particle_count = input.size();
 
     Vec3 pressure_kernel_temp;
-    for (size_t i = 0; i < particle_count; i++) {
+    for (size_t i = pstart; i < pend; i++) {
       Vec3 pressure_temp{ 0, 0, 0 };
       ns.neighbours_near(input, input.pos_x[i], input.pos_y[i], input.pos_z[i], opts, neighbours);
 
@@ -145,13 +143,12 @@ namespace particles {
     }
   }
 
-  void calculate_viscosity_forces(Particles &input, Particles &output, Neighbours &ns, const SimOpts &opts) {
-    static std::vector<std::pair<uint32_t, uint32_t>> neighbours;
+  void calculate_viscosity_forces(Particles &input, Particles &output, Neighbours &ns, size_t pstart, size_t pend, const SimOpts &opts) {
+    thread_local std::vector<std::pair<uint32_t, uint32_t>> neighbours;
     static uint32_t grid_width = std::floorf(2.0f / opts.support);
-    size_t particle_count = input.size();
     
     float viscosity_kernel_temp;
-    for (size_t i = 0; i < particle_count; i++) {
+    for (size_t i = pstart; i < pend; i++) {
       Vec3 viscosity_temp{ 0, 0, 0 };
       ns.neighbours_near(input, input.pos_x[i], input.pos_y[i], input.pos_z[i], opts, neighbours);
 
@@ -176,13 +173,11 @@ namespace particles {
     }
   }
 
-  void calculate_external_forces(Particles &input, Particles &output) {
-    size_t particle_count = input.size();
-
+  void calculate_external_forces(Particles &input, Particles &output, size_t pstart, size_t pend) {
     float force_temp_x = 0;
     float force_temp_y = 0;
     float force_temp_z = 0;
-    for (size_t i = 0; i < particle_count; i++) {
+    for (size_t i = pstart; i < pend; i++) {
       bool flow_up = input.pos_y[i] < 0
                    && std::abs(input.pos_x[i]) < FOUNTAIN_WIDTH
                    && std::abs(input.pos_z[i]) < FOUNTAIN_WIDTH;
@@ -196,13 +191,12 @@ namespace particles {
     }
   }
 
-  void integrate(Particles &output) {
-    size_t particle_count = output.size();
+  void integrate(Particles &output, size_t pstart, size_t pend) {
     float accel_x;
     float accel_y;
     float accel_z;
 
-    for (size_t i = 0; i < particle_count; i++) {
+    for (size_t i = pstart; i < pend; i++) {
       // F = ma <=> a = F/m, m = 1.0 => a = F
       accel_x = output.forces_x[i];
       accel_y = output.forces_y[i];

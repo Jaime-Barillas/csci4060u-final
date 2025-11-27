@@ -1,6 +1,7 @@
 #include "sim.h"
 #include <filesystem>
 #include <print>
+#include <thread>
 
 
 constexpr uint32_t DEFAULT_PARTICLE_COUNT = 1024;
@@ -9,6 +10,7 @@ int main(int argc, const char **argv) {
   std::filesystem::path exe_path(argv[0]);
   bool bench_mode = false;
   uint32_t particle_count = DEFAULT_PARTICLE_COUNT;
+  uint32_t thread_count;
 
   for (size_t i = 1; i < argc; i++) {
     std::string_view arg(argv[i]);
@@ -25,7 +27,10 @@ int main(int argc, const char **argv) {
     }
   }
 
-  Sim simulator(exe_path, particle_count, bench_mode);
+  thread_count = std::thread::hardware_concurrency();
+  thread_count = thread_count > 0 ? thread_count : 1;
+
+  Sim simulator(exe_path, particle_count, thread_count, bench_mode);
   try {
     simulator.init();
     simulator.run_loop();
